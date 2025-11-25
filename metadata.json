@@ -1,0 +1,5 @@
+{
+  "name": "HabitFlow - Telegram Mini App",
+  "description": "A bilingual, high-performance habit tracker designed for Telegram Mini Apps with Supabase integration and smooth animations.",
+  "requestFramePermissions": []
+}
