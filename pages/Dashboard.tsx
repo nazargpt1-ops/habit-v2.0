@@ -1,24 +1,28 @@
+
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar as CalendarIcon, Plus } from 'lucide-react';
+import { Calendar as CalendarIcon } from 'lucide-react';
 import { CalendarStrip } from '../components/CalendarStrip';
 import { HabitCard } from '../components/HabitCard';
-import { AddHabitModal } from '../components/AddHabitModal';
 import { HabitDetailsModal } from '../components/HabitDetailsModal';
 import { CircularProgress } from '../components/CircularProgress';
 import { WeeklyChart } from '../components/WeeklyChart';
 import { useLanguage } from '../context/LanguageContext';
-import { fetchHabitsWithCompletions, toggleHabitCompletion, createHabit, fetchWeeklyStats } from '../services/habitService';
-import { HabitWithCompletion, Priority } from '../types';
+import { fetchHabitsWithCompletions, toggleHabitCompletion, fetchWeeklyStats, updateHabit } from '../services/habitService';
+import { HabitWithCompletion, Habit } from '../types';
 import { getTelegramUser, hapticImpact, hapticSuccess } from '../lib/telegram';
+import confetti from 'canvas-confetti';
 
-export const Dashboard: React.FC = () => {
+interface DashboardProps {
+  lastUpdated?: number;
+}
+
+export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
   const { t, toggleLanguage, language } = useLanguage();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [habits, setHabits] = useState<HabitWithCompletion[]>([]);
   const [weeklyStats, setWeeklyStats] = useState<{day: string, count: number}[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   
   // Details Modal State
@@ -37,7 +41,7 @@ export const Dashboard: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
+  }, [loadData, lastUpdated]);
 
   // Sort Habits: Uncompleted first, then by priority
   const sortedHabits = useMemo(() => {
@@ -58,7 +62,12 @@ export const Dashboard: React.FC = () => {
   }, [habits]);
 
   const handleToggle = async (habitId: string) => {
-    hapticImpact('light');
+    // 1. Telegram Haptic Feedback
+    if (typeof window !== 'undefined' && window.Telegram?.WebApp?.HapticFeedback) {
+        window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
+    } else {
+        hapticImpact('medium'); // Fallback
+    }
     
     const habitIndex = habits.findIndex(h => h.id === habitId);
     if (habitIndex === -1) return;
@@ -68,39 +77,45 @@ export const Dashboard: React.FC = () => {
 
     if (newStatus) hapticSuccess();
 
+    // Optimistic Update
     const updatedHabits = [...habits];
     updatedHabits[habitIndex] = { ...oldHabit, completed: newStatus };
     setHabits(updatedHabits);
 
+    // 2. Celebration Effect (Confetti)
+    // Check if ALL habits are completed after this toggle
+    const totalHabits = updatedHabits.length;
+    const completedCount = updatedHabits.filter(h => h.completed).length;
+    
+    if (newStatus && totalHabits > 0 && completedCount === totalHabits) {
+        // Fire confetti from bottom center
+        confetti({
+            particleCount: 150,
+            spread: 100,
+            origin: { y: 0.8 },
+            colors: ['#60A5FA', '#F472B6', '#34D399', '#FBBF24'],
+            gravity: 1.2,
+            scalar: 1.2,
+            ticks: 300
+        });
+    }
+
+    // Persist
     const result = await toggleHabitCompletion(habitId, selectedDate, newStatus, oldHabit.completionId);
     
     if (result.success && newStatus && result.newId) {
         updatedHabits[habitIndex].completionId = result.newId;
         setHabits([...updatedHabits]);
     } else if (!result.success) {
-      setHabits(habits); // Revert
+      setHabits(habits); // Revert on failure
     }
   };
 
-  const handleAddHabit = async (title: string, priority: Priority, color: string, category: string, reminderTime?: string, reminderDate?: string, reminderDays?: string[]) => {
-    const user = getTelegramUser();
-    const newHabitMock: HabitWithCompletion = {
-      id: Math.random().toString(),
-      user_id: user.id,
-      title,
-      category,
-      priority,
-      color,
-      is_archived: false,
-      completed: false,
-      reminder_time: reminderTime,
-      reminder_date: reminderDate,
-      reminder_days: reminderDays
-    };
-    
-    setHabits(prev => [newHabitMock, ...prev]);
-    const created = await createHabit(user.id, title, priority, color, category, reminderTime, reminderDate, reminderDays);
-    if (created) loadData();
+  const handleUpdateHabit = async (id: string, updates: Partial<Habit>) => {
+      // Optimistic Update
+      setHabits(prev => prev.map(h => h.id === id ? { ...h, ...updates } : h));
+      // Persist
+      await updateHabit(id, updates);
   };
 
   const openDetails = (habit: HabitWithCompletion) => {
@@ -122,7 +137,7 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Main Scrollable Area */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden pb-28 pt-4 space-y-8 relative z-10 no-scrollbar">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden pb-32 pt-4 space-y-8 relative z-10 no-scrollbar">
         
         {/* Glass Hero Card */}
         <div className="mx-4 mt-2 p-6 bg-white/60 backdrop-blur-xl rounded-[2.5rem] border border-white/50 shadow-xl relative overflow-hidden transition-all duration-300">
@@ -218,6 +233,7 @@ export const Dashboard: React.FC = () => {
                         habit={habit} 
                         onToggle={handleToggle} 
                         onOpenDetails={openDetails}
+                        onUpdate={handleUpdateHabit}
                       />
                     ))}
                   </div>
@@ -241,22 +257,6 @@ export const Dashboard: React.FC = () => {
         </section>
 
       </div>
-
-      {/* Floating Add Button */}
-      <motion.button
-        whileTap={{ scale: 0.9 }}
-        onClick={() => setIsModalOpen(true)}
-        className="fixed bottom-24 right-6 z-40 w-16 h-16 rounded-full bg-black text-white flex items-center justify-center shadow-2xl shadow-black/30 border-4 border-white/20 backdrop-blur-sm"
-      >
-        <Plus size={32} strokeWidth={2.5} />
-      </motion.button>
-
-      {/* Modals */}
-      <AddHabitModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        onSave={handleAddHabit} 
-      />
 
       <HabitDetailsModal
         isOpen={isDetailsOpen}

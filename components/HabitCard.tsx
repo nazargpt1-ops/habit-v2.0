@@ -1,7 +1,8 @@
-import React from 'react';
+
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, useMotionValue } from 'framer-motion';
-import { Check, Droplet, Book, Activity, Moon, Star, Zap, Flame } from 'lucide-react';
-import { HabitWithCompletion } from '../types';
+import { Check, Droplet, Book, Activity, Moon, Star, Zap, Flame, Bell } from 'lucide-react';
+import { HabitWithCompletion, Habit } from '../types';
 import { cn } from '../lib/utils';
 import confetti from 'canvas-confetti';
 
@@ -9,6 +10,7 @@ interface HabitCardProps {
   habit: HabitWithCompletion;
   onToggle: (id: string) => void;
   onOpenDetails: (habit: HabitWithCompletion) => void;
+  onUpdate: (id: string, updates: Partial<Habit>) => void;
 }
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -34,8 +36,10 @@ const hexToRgba = (hex: string, alpha: number) => {
     return hex;
 }
 
-export const HabitCard: React.FC<HabitCardProps> = ({ habit, onToggle, onOpenDetails }) => {
+export const HabitCard: React.FC<HabitCardProps> = ({ habit, onToggle, onOpenDetails, onUpdate }) => {
   const x = useMotionValue(0);
+  const [isEditingTime, setIsEditingTime] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   
   const handleDragEnd = (event: any, info: any) => {
     if (info.offset.x > 80 && !habit.completed) {
@@ -61,15 +65,59 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit, onToggle, onOpenDet
       });
   };
 
+  const handleBadgeClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault(); // Prevent bubbling issues
+      
+      if (window.Telegram?.WebApp?.HapticFeedback) {
+          window.Telegram.WebApp.HapticFeedback.selectionChanged();
+      }
+      setIsEditingTime(true);
+  };
+
+  useEffect(() => {
+    if (isEditingTime && inputRef.current) {
+        // Attempt to focus and open the picker
+        inputRef.current.focus();
+        
+        // Use showPicker() if supported (modern browsers/mobile)
+        if ('showPicker' in inputRef.current) {
+             try {
+                 (inputRef.current as any).showPicker();
+             } catch (err) {
+                 // Fallback if showPicker fails or is not allowed without user activation
+             }
+        }
+    }
+  }, [isEditingTime]);
+
+  const handleTimeBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+      const newTime = e.target.value;
+      if (newTime && newTime !== habit.reminder_time) {
+          if (window.Telegram?.WebApp?.HapticFeedback) {
+             window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+          }
+          onUpdate(habit.id, { reminder_time: newTime });
+      }
+      setIsEditingTime(false);
+  };
+  
+  // Also handle manual Enter key for desktop testing
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') {
+          e.currentTarget.blur();
+      }
+  };
+
   return (
     <motion.div
       drag="x"
       dragConstraints={{ left: 0, right: 0 }}
       dragElastic={0.1}
       onDragEnd={handleDragEnd}
-      whileTap={{ scale: 0.96 }}
+      whileTap={{ scale: 0.98 }}
       style={{ x }}
-      className="relative mb-3 group touch-pan-y"
+      className="relative mb-3 group touch-pan-y select-none"
     >
       <div 
         onClick={() => onOpenDetails(habit)}
@@ -101,7 +149,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit, onToggle, onOpenDet
                   {habit.title}
                 </span>
                 
-                {/* Streak Badge - Juicier version */}
+                {/* Streak Badge */}
                 {habit.currentStreak !== undefined && habit.currentStreak > 0 && !habit.completed && (
                     <div className="flex items-center gap-1.5 px-2.5 py-1 bg-orange-100/80 text-orange-600 rounded-full text-[12px] font-bold shadow-sm border border-orange-200/50">
                         <Flame size={14} className="fill-orange-500 text-orange-600" />
@@ -110,13 +158,37 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit, onToggle, onOpenDet
                 )}
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 font-semibold bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100">{habit.category}</span>
+            <div className="flex items-center flex-wrap gap-2">
+              {/* Category Badge */}
+              <span className="text-xs text-gray-500 font-semibold bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100">
+                {habit.category}
+              </span>
+
+              {/* Reminder Badge (Interactive) */}
               {habit.reminder_time && (
-                 <>
-                   <span className="text-gray-300 text-[10px]">•</span>
-                   <span className="text-xs text-gray-400 font-medium">{habit.reminder_time}</span>
-                 </>
+                 <motion.button 
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleBadgeClick}
+                    className="flex items-center gap-1.5 text-[11px] text-gray-400 font-medium bg-gray-50/50 px-2.5 py-1 rounded-lg border border-gray-100/50 min-h-[28px] min-w-[60px] justify-center hover:bg-gray-100/80 transition-colors relative"
+                 >
+                    {isEditingTime ? (
+                        <input
+                            ref={inputRef}
+                            type="time"
+                            defaultValue={habit.reminder_time}
+                            onClick={(e) => e.stopPropagation()}
+                            onBlur={handleTimeBlur}
+                            onKeyDown={handleKeyDown}
+                            className="bg-transparent border-none outline-none w-full h-full text-[11px] font-medium text-gray-600 leading-none text-center p-0 m-0 absolute inset-0 opacity-100"
+                            style={{ colorScheme: 'light' }}
+                        />
+                    ) : (
+                        <>
+                            <Bell size={11} className="fill-gray-300" />
+                            <span>{habit.reminder_time}</span>
+                        </>
+                    )}
+                 </motion.button>
               )}
             </div>
           </div>
@@ -130,10 +202,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit, onToggle, onOpenDet
               onToggle(habit.id);
           }}
           className={cn(
-            "w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 shrink-0 ml-2",
+            "w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 shrink-0 ml-2 active:scale-90",
             habit.completed 
               ? "bg-green-500 shadow-[0_4px_12px_rgba(34,197,94,0.4)] scale-105" 
-              : "bg-gray-100 hover:bg-gray-200 active:scale-90"
+              : "bg-gray-100 hover:bg-gray-200"
           )}
         >
           {habit.completed 

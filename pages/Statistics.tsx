@@ -1,72 +1,153 @@
 
 import React, { useEffect, useState } from 'react';
-import { StatsChart } from '../components/StatsChart';
+import { HistoryHeatmap } from '../components/HistoryHeatmap';
 import { useLanguage } from '../context/LanguageContext';
 import { getTelegramUser } from '../lib/telegram';
-import { fetchWeeklyStats } from '../services/habitService';
-import { Trophy, Users, Target } from 'lucide-react';
+import { fetchHeatmapData, HeatmapData } from '../services/habitService';
+import { Trophy, Flame, CheckCircle2, TrendingUp, Share2 } from 'lucide-react';
 
 export const Statistics: React.FC = () => {
   const { t } = useLanguage();
-  const [data, setData] = useState<{ day: string; count: number }[]>([]);
+  const [heatmapData, setHeatmapData] = useState<HeatmapData[]>([]);
+  const [totalCompletions, setTotalCompletions] = useState(0);
+  const [currentStreak, setCurrentStreak] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadStats = async () => {
+      setIsLoading(true);
       const user = getTelegramUser();
-      const stats = await fetchWeeklyStats(user.id);
-      setData(stats);
+      const { heatmap, totalCompletions, currentStreak } = await fetchHeatmapData(user.id);
+      setHeatmapData(heatmap);
+      setTotalCompletions(totalCompletions);
+      setCurrentStreak(currentStreak);
+      setIsLoading(false);
     };
     loadStats();
   }, []);
 
+  const handleShare = () => {
+    // 1. Haptic Feedback
+    if (typeof window !== 'undefined' && window.Telegram?.WebApp?.HapticFeedback) {
+      window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+    }
+
+    // 2. Prepare Message
+    const text = `📊 My progress in HabitFlow:\n• Current Streak: ${currentStreak} days\n• Total Completed: ${totalCompletions}\n\nKeep consistent! 🚀`;
+    const appUrl = 'https://t.me/HabitFlowBot';
+    
+    // 3. Construct Telegram Share URL
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(appUrl)}&text=${encodeURIComponent(text)}`;
+
+    // 4. Open Link
+    if (typeof window !== 'undefined' && (window as any).Telegram?.WebApp?.openTelegramLink) {
+        (window as any).Telegram.WebApp.openTelegramLink(shareUrl);
+    } else {
+        // Fallback for web testing
+        window.open(shareUrl, '_blank');
+    }
+  };
+
   return (
-    <div className="p-4 pt-8 h-full overflow-y-auto pb-24">
-      <h1 className="text-2xl font-bold mb-6">{t.statsTab}</h1>
-      
-      <StatsChart data={data} />
-      
-      <div className="grid grid-cols-2 gap-4 mt-6 mb-8">
-        <div className="bg-[var(--tg-theme-secondary-bg-color)] p-4 rounded-2xl">
-          <p className="text-[var(--tg-theme-hint-color)] text-xs uppercase font-bold tracking-wider mb-1">{t.totalHabits}</p>
-          <p className="text-3xl font-bold text-[var(--tg-theme-text-color)]">4</p>
-        </div>
-        <div className="bg-[var(--tg-theme-secondary-bg-color)] p-4 rounded-2xl">
-          <p className="text-[var(--tg-theme-hint-color)] text-xs uppercase font-bold tracking-wider mb-1">{t.completionRate}</p>
-          <p className="text-3xl font-bold text-[var(--tg-theme-button-color)]">85%</p>
-        </div>
+    <div className="p-4 pt-8 h-full overflow-y-auto pb-32 no-scrollbar bg-[#FAFAFA] relative">
+      {/* Background Orbs reused for consistency */}
+      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[20%] right-[-10%] w-[400px] h-[400px] bg-purple-300/20 rounded-full blur-[80px]" />
+        <div className="absolute bottom-[-10%] left-[-10%] w-[400px] h-[400px] bg-blue-300/20 rounded-full blur-[80px]" />
       </div>
 
-      {/* Challenges Section Stub */}
-      <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-          <Trophy className="text-yellow-500" /> {t.challengesTab || "Challenges"}
-      </h2>
-      
-      <div className="space-y-4">
-          <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-5 text-white shadow-lg relative overflow-hidden">
-              <div className="absolute right-0 top-0 opacity-10 transform translate-x-1/4 -translate-y-1/4">
-                  <Target size={120} />
-              </div>
-              <div className="relative z-10">
-                  <span className="bg-white/20 text-xs font-bold px-2 py-1 rounded-md">GLOBAL</span>
-                  <h3 className="text-lg font-bold mt-2">30 Days of Mindfulness</h3>
-                  <div className="flex items-center gap-2 mt-3 text-sm opacity-90">
-                      <Users size={16} /> 1,240 Participants
-                  </div>
-                  <button className="mt-4 w-full py-2 bg-white text-indigo-600 font-bold rounded-xl text-sm active:scale-95 transition-transform">
-                      Join Challenge
-                  </button>
-              </div>
-          </div>
-          
-           <div className="bg-[var(--tg-theme-secondary-bg-color)] rounded-2xl p-5 flex items-center justify-between opacity-70">
-              <div>
-                  <h3 className="font-bold text-[var(--tg-theme-text-color)]">Early Birds</h3>
-                  <p className="text-xs text-[var(--tg-theme-hint-color)]">Wake up at 6 AM</p>
-              </div>
-              <button className="px-4 py-2 bg-[var(--tg-theme-button-color)]/20 text-[var(--tg-theme-button-color)] font-bold rounded-xl text-xs">
-                  Coming Soon
-              </button>
-          </div>
+      <div className="relative z-10 space-y-6">
+        
+        <header>
+            <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Profile & Stats</h1>
+            <p className="text-gray-500 font-medium mt-1">Your journey at a glance</p>
+        </header>
+
+        {/* Top Cards Grid */}
+        <div className="grid grid-cols-2 gap-4">
+            
+            {/* Current Streak Card */}
+            <div className="bg-white/70 backdrop-blur-lg p-5 rounded-[2rem] shadow-lg border border-white/60 relative overflow-hidden group">
+                 <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                     <Flame size={60} className="text-orange-500 rotate-12" />
+                 </div>
+                 
+                 {/* Share Button - Only visible if streak > 0 */}
+                 {currentStreak > 0 && (
+                   <button 
+                     onClick={handleShare}
+                     className="absolute top-3 right-3 z-20 p-2.5 rounded-full bg-white/40 hover:bg-white/60 text-orange-600 transition-all active:scale-95 shadow-sm backdrop-blur-sm"
+                     aria-label="Share Statistics"
+                   >
+                     <Share2 size={16} strokeWidth={2.5} />
+                   </button>
+                 )}
+
+                 <div className="relative z-10">
+                     <div className="flex items-center gap-2 mb-2">
+                         <div className="p-2 bg-orange-100 rounded-full text-orange-600">
+                             <Flame size={18} fill="currentColor" />
+                         </div>
+                         <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{t.streak}</span>
+                     </div>
+                     <p className="text-3xl font-black text-gray-800">{currentStreak}</p>
+                     <p className="text-xs text-gray-500 font-medium mt-1">Days in a row</p>
+                 </div>
+            </div>
+
+            {/* Total Completions Card */}
+            <div className="bg-white/70 backdrop-blur-lg p-5 rounded-[2rem] shadow-lg border border-white/60 relative overflow-hidden group">
+                 <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                     <CheckCircle2 size={60} className="text-blue-500 -rotate-12" />
+                 </div>
+                 <div className="relative z-10">
+                     <div className="flex items-center gap-2 mb-2">
+                         <div className="p-2 bg-blue-100 rounded-full text-blue-600">
+                             <TrendingUp size={18} />
+                         </div>
+                         <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total</span>
+                     </div>
+                     <p className="text-3xl font-black text-gray-800">{totalCompletions}</p>
+                     <p className="text-xs text-gray-500 font-medium mt-1">Habits done</p>
+                 </div>
+            </div>
+        </div>
+
+        {/* Heatmap Section */}
+        {isLoading ? (
+            <div className="h-48 bg-white/50 animate-pulse rounded-[2.5rem]" />
+        ) : (
+            <HistoryHeatmap data={heatmapData} />
+        )}
+
+        {/* Challenges Teaser */}
+        <div>
+            <div className="flex items-center justify-between mb-4 px-2">
+                 <h2 className="text-xl font-bold text-gray-800 tracking-tight flex items-center gap-2">
+                    <Trophy className="text-yellow-500" size={20} /> {t.challengesTab || "Challenges"}
+                 </h2>
+                 <span className="text-xs font-bold text-gray-400 bg-white/50 px-2 py-1 rounded-md">New</span>
+            </div>
+            
+            <div className="bg-gradient-to-br from-[#4F46E5] to-[#7C3AED] rounded-[2rem] p-6 text-white shadow-xl shadow-indigo-500/20 relative overflow-hidden">
+                <div className="absolute -right-10 -top-10 text-white/10">
+                    <Trophy size={140} />
+                </div>
+                <div className="relative z-10">
+                    <span className="bg-white/20 backdrop-blur-md text-[10px] font-bold px-2 py-1 rounded-md border border-white/10">GLOBAL CHALLENGE</span>
+                    <h3 className="text-xl font-bold mt-3 mb-1">Consistency Master</h3>
+                    <p className="text-white/80 text-sm mb-4">Complete 50 habits this month to unlock the badge.</p>
+                    
+                    <div className="w-full bg-black/20 rounded-full h-2 mb-4">
+                         <div className="bg-white h-2 rounded-full" style={{ width: '65%' }}></div>
+                    </div>
+                    
+                    <button className="w-full py-3 bg-white text-indigo-600 font-bold rounded-xl text-sm active:scale-95 transition-transform shadow-lg">
+                        View Progress
+                    </button>
+                </div>
+            </div>
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
+import { X, Clock, Bell } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { Priority, Translations } from '../types';
 import { cn } from '../lib/utils';
@@ -29,7 +30,6 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({ isOpen, onClose, o
   
   // Reminder State
   const [reminderEnabled, setReminderEnabled] = useState(false);
-  const [reminderDate, setReminderDate] = useState('');
   const [reminderTime, setReminderTime] = useState('09:00');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -37,7 +37,6 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({ isOpen, onClose, o
     if (!title.trim()) return;
     hapticImpact('medium');
     
-    // Fix: Extract category string
     const category = selectedColorObj.category;
 
     onSave(
@@ -46,7 +45,7 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({ isOpen, onClose, o
         selectedColorObj.color,
         category, 
         reminderEnabled ? reminderTime : undefined, 
-        reminderEnabled ? reminderDate : undefined,
+        undefined, // Date is optional/removed for now to focus on daily habits
         undefined
     );
     
@@ -55,7 +54,6 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({ isOpen, onClose, o
     setPriority('medium');
     setReminderEnabled(false);
     setReminderTime('09:00');
-    setReminderDate('');
     onClose();
   };
 
@@ -164,34 +162,87 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({ isOpen, onClose, o
                 </div>
               </div>
 
-              {/* Reminder Section */}
-              <div className="space-y-3 pt-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-[var(--tg-theme-hint-color)]">SET REMINDER</label>
-                  <button 
-                    type="button" 
-                    onClick={() => setReminderEnabled(!reminderEnabled)}
-                    className={`w-10 h-6 rounded-full transition-all ${ reminderEnabled ? 'bg-blue-500' : 'bg-gray-300'}`}
-                  >
-                    <div className={`w-5 h-5 rounded-full bg-white transition-transform ${reminderEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
-                  </button>
-                </div>
-                {reminderEnabled && (
-                  <div className="space-y-2">
-                    <input 
-                      type="date" 
-                      value={reminderDate} 
-                      onChange={(e) => setReminderDate(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg bg-[var(--tg-theme-secondary-bg-color)] text-[var(--tg-theme-text-color)] border border-[var(--tg-theme-hint-color)]"
-                    />
-                    <input 
-                      type="time" 
-                      value={reminderTime} 
-                      onChange={(e) => setReminderTime(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg bg-[var(--tg-theme-secondary-bg-color)] text-[var(--tg-theme-text-color)] border border-[var(--tg-theme-hint-color)]"
-                    />
-                  </div>
-                )}
+              {/* Smart Reminder Section */}
+              <div className="space-y-3">
+                 <div className="flex items-center justify-between p-4 bg-[var(--tg-theme-secondary-bg-color)] rounded-2xl">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-blue-500 shadow-sm">
+                            <Bell size={20} fill={reminderEnabled ? "currentColor" : "none"} />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="font-bold text-[var(--tg-theme-text-color)]">{t.enableReminder}</span>
+                            <span className="text-xs text-[var(--tg-theme-hint-color)]">Get notified daily</span>
+                        </div>
+                    </div>
+                    
+                    {/* iOS Style Switch */}
+                    <button 
+                        type="button"
+                        onClick={() => {
+                            setReminderEnabled(!reminderEnabled);
+                            hapticImpact('light');
+                        }}
+                        className={cn(
+                            "w-12 h-7 rounded-full p-1 transition-colors duration-300 ease-in-out relative focus:outline-none",
+                            reminderEnabled ? "bg-[var(--tg-theme-button-color)]" : "bg-gray-300 dark:bg-gray-600"
+                        )}
+                    >
+                        <motion.div
+                            layout
+                            transition={{ type: "spring", stiffness: 700, damping: 30 }}
+                            className="w-5 h-5 bg-white rounded-full shadow-md"
+                            style={{ 
+                                x: reminderEnabled ? 20 : 0 
+                            }}
+                        />
+                    </button>
+                 </div>
+
+                 <AnimatePresence>
+                    {reminderEnabled && (
+                        <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-hidden"
+                        >
+                            <div className="flex items-center gap-3 p-4 bg-[var(--tg-theme-secondary-bg-color)] rounded-2xl border border-[var(--tg-theme-hint-color)]/10">
+                                <Clock size={20} className="text-[var(--tg-theme-hint-color)]" />
+                                <span className="text-sm font-semibold text-[var(--tg-theme-text-color)] flex-1">
+                                    {t.remindAt || "Remind at"}
+                                </span>
+                                <div className="flex items-center justify-end">
+                                  <div className="relative">
+                                    {/* Visual Fake Button / Wrapper */}
+                                    <input
+                                      type="time"
+                                      value={reminderTime}
+                                      onChange={(e) => setReminderTime(e.target.value)}
+                                      className="
+                                        appearance-none
+                                        bg-gray-100 
+                                        hover:bg-gray-200 
+                                        text-gray-900 
+                                        text-2xl 
+                                        font-bold 
+                                        rounded-xl 
+                                        px-6 
+                                        py-3 
+                                        h-16
+                                        min-w-[160px] 
+                                        text-center 
+                                        outline-none 
+                                        border-2 border-transparent focus:border-blue-500
+                                        cursor-pointer
+                                        transition-all
+                                      "
+                                    />
+                                  </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                 </AnimatePresence>
               </div>
 
             </div>

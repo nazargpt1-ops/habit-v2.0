@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, PropsWithChildren } from 'react';
 import { Translations, Language } from '../types';
 
 const dictionaries: Record<Language, Translations> = {
@@ -114,7 +114,7 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
-export const LanguageProvider = ({ children }: { children: ReactNode }) => {
+export const LanguageProvider = ({ children }: PropsWithChildren) => {
   const [language, setLanguage] = useState<Language>('en');
 
   useEffect(() => {

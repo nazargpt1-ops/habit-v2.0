@@ -36,6 +36,7 @@ declare global {
         HapticFeedback: {
           impactOccurred: (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft') => void;
           notificationOccurred: (type: 'error' | 'success' | 'warning') => void;
+          selectionChanged: () => void;
         };
       };
     };
@@ -86,5 +87,11 @@ export const hapticImpact = (style: 'light' | 'medium' | 'heavy' = 'medium') => 
 export const hapticSuccess = () => {
   if (typeof window !== 'undefined' && window.Telegram?.WebApp?.HapticFeedback) {
     window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+  }
+};
+
+export const hapticSelection = () => {
+  if (typeof window !== 'undefined' && window.Telegram?.WebApp?.HapticFeedback) {
+    window.Telegram.WebApp.HapticFeedback.selectionChanged();
   }
 };
