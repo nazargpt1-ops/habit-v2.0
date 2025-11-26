@@ -1,8 +1,7 @@
-
 import React from 'react';
-import { motion, useMotionValue, useTransform } from 'framer-motion';
-import { Check, Droplet, Book, Activity, Moon, Star, Zap, ChevronRight, FileText, Clock } from 'lucide-react';
-import { HabitWithCompletion, Priority } from '../types';
+import { motion, useMotionValue } from 'framer-motion';
+import { Check, Droplet, Book, Activity, Moon, Star, Zap, Flame } from 'lucide-react';
+import { HabitWithCompletion } from '../types';
 import { cn } from '../lib/utils';
 import confetti from 'canvas-confetti';
 
@@ -13,117 +12,117 @@ interface HabitCardProps {
 }
 
 const iconMap: Record<string, React.ReactNode> = {
-  droplet: <Droplet size={20} />,
-  book: <Book size={20} />,
-  activity: <Activity size={20} />,
-  moon: <Moon size={20} />,
-  star: <Star size={20} />,
-  zap: <Zap size={20} />,
+  droplet: <Droplet size={24} strokeWidth={2.5} />,
+  book: <Book size={24} strokeWidth={2.5} />,
+  activity: <Activity size={24} strokeWidth={2.5} />,
+  moon: <Moon size={24} strokeWidth={2.5} />,
+  star: <Star size={24} strokeWidth={2.5} />,
+  zap: <Zap size={24} strokeWidth={2.5} />,
 };
 
-const PriorityIndicator = ({ priority }: { priority: Priority }) => {
-  if (priority === 'high') return <div className="absolute left-0 top-3 bottom-3 w-1 bg-red-500 rounded-r-full z-20" />;
-  if (priority === 'medium') return <div className="absolute left-0 top-3 bottom-3 w-1 bg-orange-400 rounded-r-full z-20" />;
-  return <div className="absolute left-0 top-3 bottom-3 w-1 bg-blue-300 rounded-r-full z-20" />;
-};
+// Helper to convert hex to rgba for pastel backgrounds
+const hexToRgba = (hex: string, alpha: number) => {
+    let c: any;
+    if(/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)){
+        c= hex.substring(1).split('');
+        if(c.length== 3){
+            c= [c[0], c[0], c[1], c[1], c[2], c[2]];
+        }
+        c= '0x'+c.join('');
+        return 'rgba('+[(c>>16)&255, (c>>8)&255, c&255].join(',')+','+alpha+')';
+    }
+    return hex;
+}
 
 export const HabitCard: React.FC<HabitCardProps> = ({ habit, onToggle, onOpenDetails }) => {
   const x = useMotionValue(0);
-  const opacityRight = useTransform(x, [50, 100], [0, 1]);
-  const opacityLeft = useTransform(x, [-50, -100], [0, 1]);
   
   const handleDragEnd = (event: any, info: any) => {
-    if (info.offset.x > 100 && !habit.completed) {
-      // Swiped Right -> Complete
+    if (info.offset.x > 80 && !habit.completed) {
        triggerConfetti(event);
        onToggle(habit.id);
-    } else if (info.offset.x < -100) {
-      // Swiped Left -> Details
+    } else if (info.offset.x < -80) {
       onOpenDetails(habit);
     }
   };
 
   const triggerConfetti = (e: any) => {
-      // Fallback center if event is drag
-      const x = 0.5; 
-      const y = 0.5;
+      const x = e.clientX ? e.clientX / window.innerWidth : 0.5;
+      const y = e.clientY ? e.clientY / window.innerHeight : 0.5;
       
       confetti({
         origin: { x, y },
-        particleCount: 60,
+        particleCount: 40,
         spread: 70,
-        colors: [habit.color, '#ffffff']
+        colors: [habit.color, '#fbbf24', '#ffffff'],
+        disableForReducedMotion: true,
+        ticks: 200,
+        gravity: 1.2,
       });
   };
 
   return (
-    <div className="relative mb-3 h-20 overflow-hidden rounded-2xl group">
-      {/* Background Layers for Swipe Actions */}
-      <motion.div 
-        style={{ opacity: opacityRight, backgroundColor: habit.color }} 
-        className="absolute inset-y-0 left-0 w-full flex items-center justify-start pl-6 z-0 rounded-2xl"
-      >
-        <Check className="text-white" size={24} strokeWidth={4} />
-      </motion.div>
-      
-      <motion.div 
-        style={{ opacity: opacityLeft }} 
-        className="absolute inset-y-0 right-0 w-full bg-gray-200 dark:bg-gray-700 flex items-center justify-end pr-6 z-0 rounded-2xl"
-      >
-        <FileText className="text-[var(--tg-theme-text-color)]" size={24} />
-      </motion.div>
-
-      {/* Main Card Content */}
-      <motion.div
-        drag="x"
-        dragConstraints={{ left: 0, right: 0 }}
-        dragElastic={0.2} // Bouncy feel
-        onDragEnd={handleDragEnd}
-        style={{ x }}
+    <motion.div
+      drag="x"
+      dragConstraints={{ left: 0, right: 0 }}
+      dragElastic={0.1}
+      onDragEnd={handleDragEnd}
+      whileTap={{ scale: 0.96 }}
+      style={{ x }}
+      className="relative mb-3 group touch-pan-y"
+    >
+      <div 
+        onClick={() => onOpenDetails(habit)}
         className={cn(
-          "relative z-10 h-full w-full flex items-center justify-between p-4 bg-[var(--tg-theme-secondary-bg-color)] border border-transparent transition-colors",
-          habit.completed ? "opacity-60" : "opacity-100"
+            "relative z-10 w-full p-4 flex items-center justify-between bg-white rounded-[24px] shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-transparent transition-all duration-300",
+            !habit.completed && "hover:shadow-[0_8px_25px_-6px_rgba(0,0,0,0.1)]",
+            habit.completed ? "opacity-60 saturate-50" : "opacity-100"
         )}
       >
-        <PriorityIndicator priority={habit.priority || 'medium'} />
-        
-        <div className="flex items-center gap-4 pl-3" onClick={() => onOpenDetails(habit)}>
-          {/* Icon */}
+        <div className="flex items-center gap-4 overflow-hidden">
+          {/* Icon with Pastel Background */}
           <div 
-            className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-md shrink-0"
-            style={{ backgroundColor: habit.color }}
+            className="w-14 h-14 rounded-[20px] flex items-center justify-center shrink-0 transition-all duration-300 shadow-sm"
+            style={{ 
+                backgroundColor: hexToRgba(habit.color, 0.15),
+                color: habit.color 
+            }}
           >
-            {iconMap[habit.icon || 'star'] || <Star size={20} />}
+            {iconMap[habit.icon || 'star'] || <Star size={24} strokeWidth={2.5} />}
           </div>
           
-          {/* Text */}
-          <div className="flex flex-col">
-            <span className={cn(
-              "font-semibold text-base transition-all line-clamp-1 text-[var(--tg-theme-text-color)]",
-              habit.completed && "line-through"
-            )}>
-              {habit.title}
-            </span>
-            <div className="flex items-center gap-2 text-xs text-[var(--tg-theme-hint-color)]">
-              <span>{habit.category}</span>
-              
-              {/* Reminder Time Display */}
-              {habit.reminder_time && (
-                <span className="flex items-center gap-1 text-[var(--tg-theme-hint-color)]">
-                   • <Clock size={10} /> {habit.reminder_time}
+          {/* Text Info */}
+          <div className="flex flex-col min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+                <span className={cn(
+                  "font-bold text-gray-800 text-[17px] leading-tight truncate transition-all",
+                  habit.completed && "line-through text-gray-400"
+                )}>
+                  {habit.title}
                 </span>
-              )}
+                
+                {/* Streak Badge - Juicier version */}
+                {habit.currentStreak !== undefined && habit.currentStreak > 0 && !habit.completed && (
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-orange-100/80 text-orange-600 rounded-full text-[12px] font-bold shadow-sm border border-orange-200/50">
+                        <Flame size={14} className="fill-orange-500 text-orange-600" />
+                        <span>{habit.currentStreak}</span>
+                    </div>
+                )}
+            </div>
 
-              {habit.currentStreak !== undefined && habit.currentStreak > 0 && (
-                 <span className="flex items-center text-orange-500 font-bold ml-1">
-                   <Zap size={10} className="mr-0.5 fill-current" /> {habit.currentStreak}
-                 </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 font-semibold bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100">{habit.category}</span>
+              {habit.reminder_time && (
+                 <>
+                   <span className="text-gray-300 text-[10px]">•</span>
+                   <span className="text-xs text-gray-400 font-medium">{habit.reminder_time}</span>
+                 </>
               )}
             </div>
           </div>
         </div>
 
-        {/* Checkbox Button (Clickable alternative to swipe) */}
+        {/* Custom Circular Checkbox */}
         <button
           onClick={(e) => {
               e.stopPropagation();
@@ -131,15 +130,18 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit, onToggle, onOpenDet
               onToggle(habit.id);
           }}
           className={cn(
-            "w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all shrink-0 ml-2",
+            "w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 shrink-0 ml-2",
             habit.completed 
-              ? "bg-[var(--tg-theme-button-color)] border-[var(--tg-theme-button-color)]" 
-              : "border-[var(--tg-theme-hint-color)]"
+              ? "bg-green-500 shadow-[0_4px_12px_rgba(34,197,94,0.4)] scale-105" 
+              : "bg-gray-100 hover:bg-gray-200 active:scale-90"
           )}
         >
-          {habit.completed && <Check size={16} className="text-white" strokeWidth={3} />}
+          {habit.completed 
+            ? <Check size={24} className="text-white drop-shadow-sm" strokeWidth={3.5} />
+            : <div className="w-4 h-4 rounded-full border-2 border-gray-300" />
+          }
         </button>
-      </motion.div>
-    </div>
+      </div>
+    </motion.div>
   );
 };
