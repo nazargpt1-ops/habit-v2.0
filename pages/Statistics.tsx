@@ -59,8 +59,8 @@ export const Statistics: React.FC = () => {
       <div className="relative z-10 space-y-6">
         
         <header>
-            <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Profile & Stats</h1>
-            <p className="text-gray-500 font-medium mt-1">Your journey at a glance</p>
+            <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">{t.profile_stats}</h1>
+            <p className="text-gray-500 font-medium mt-1">{t.profile_subtitle}</p>
         </header>
 
         {/* Top Cards Grid */}
@@ -88,10 +88,10 @@ export const Statistics: React.FC = () => {
                          <div className="p-2 bg-orange-100 rounded-full text-orange-600">
                              <Flame size={18} fill="currentColor" />
                          </div>
-                         <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{t.streak}</span>
+                         <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{t.streak_label}</span>
                      </div>
                      <p className="text-3xl font-black text-gray-800">{currentStreak}</p>
-                     <p className="text-xs text-gray-500 font-medium mt-1">Days in a row</p>
+                     <p className="text-xs text-gray-500 font-medium mt-1">{t.days_in_row}</p>
                  </div>
             </div>
 
@@ -105,10 +105,10 @@ export const Statistics: React.FC = () => {
                          <div className="p-2 bg-blue-100 rounded-full text-blue-600">
                              <TrendingUp size={18} />
                          </div>
-                         <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total</span>
+                         <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{t.total_label}</span>
                      </div>
                      <p className="text-3xl font-black text-gray-800">{totalCompletions}</p>
-                     <p className="text-xs text-gray-500 font-medium mt-1">Habits done</p>
+                     <p className="text-xs text-gray-500 font-medium mt-1">{t.habits_done}</p>
                  </div>
             </div>
         </div>
@@ -124,9 +124,9 @@ export const Statistics: React.FC = () => {
         <div>
             <div className="flex items-center justify-between mb-4 px-2">
                  <h2 className="text-xl font-bold text-gray-800 tracking-tight flex items-center gap-2">
-                    <Trophy className="text-yellow-500" size={20} /> {t.challengesTab || "Challenges"}
+                    <Trophy className="text-yellow-500" size={20} /> {t.challenges_title}
                  </h2>
-                 <span className="text-xs font-bold text-gray-400 bg-white/50 px-2 py-1 rounded-md">New</span>
+                 <span className="text-xs font-bold text-gray-400 bg-white/50 px-2 py-1 rounded-md">{t.new_badge}</span>
             </div>
             
             <div className="bg-gradient-to-br from-[#4F46E5] to-[#7C3AED] rounded-[2rem] p-6 text-white shadow-xl shadow-indigo-500/20 relative overflow-hidden">
@@ -134,16 +134,16 @@ export const Statistics: React.FC = () => {
                     <Trophy size={140} />
                 </div>
                 <div className="relative z-10">
-                    <span className="bg-white/20 backdrop-blur-md text-[10px] font-bold px-2 py-1 rounded-md border border-white/10">GLOBAL CHALLENGE</span>
-                    <h3 className="text-xl font-bold mt-3 mb-1">Consistency Master</h3>
-                    <p className="text-white/80 text-sm mb-4">Complete 50 habits this month to unlock the badge.</p>
+                    <span className="bg-white/20 backdrop-blur-md text-[10px] font-bold px-2 py-1 rounded-md border border-white/10 uppercase">{t.global_challenge}</span>
+                    <h3 className="text-xl font-bold mt-3 mb-1">{t.consistency_master}</h3>
+                    <p className="text-white/80 text-sm mb-4">{t.challenge_desc}</p>
                     
                     <div className="w-full bg-black/20 rounded-full h-2 mb-4">
                          <div className="bg-white h-2 rounded-full" style={{ width: '65%' }}></div>
                     </div>
                     
                     <button className="w-full py-3 bg-white text-indigo-600 font-bold rounded-xl text-sm active:scale-95 transition-transform shadow-lg">
-                        View Progress
+                        {t.view_progress}
                     </button>
                 </div>
             </div>

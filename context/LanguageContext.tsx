@@ -41,7 +41,6 @@ const dictionaries: Record<Language, Translations> = {
     everyday: "Everyday",
     swipeHint: "Swipe right to complete",
     theme: "Theme",
-    // New additions
     enableReminder: "Enable Reminder",
     colorHealth: "Health",
     colorWork: "Work",
@@ -51,7 +50,84 @@ const dictionaries: Record<Language, Translations> = {
     colorEnergy: "Energy",
     setFor: "Set for",
     remindAt: "Remind at",
-    category: "Category"
+    category: "Category",
+
+    // New I18n Keys
+    ready_to_start: "Ready to start?",
+    one_step: "One step at a time",
+    weekly_focus: "Weekly Focus",
+    consistency_score: "Your consistency score",
+    last_7_days: "Last 7 Days",
+    habits_section_title: "Habits",
+    done_count: "Done",
+    create_habit_btn: "Create New Habit",
+    edit_habit: "Edit Habit",
+    habit_title_label: "Habit Title",
+    placeholder_title: "e.g. Read Books",
+    priority_label: "Priority",
+    priority_low: "Low",
+    priority_medium: "Medium",
+    priority_high: "High",
+    category_label: "Category",
+    enable_reminder: "Enable Reminder",
+    get_notified: "Get notified daily",
+    remind_at: "Remind at",
+    save_habit: "Save Habit",
+    save_changes: "Save Changes",
+    delete_habit: "Delete Habit",
+    confirm: "Confirm",
+    selected_date: "Selected",
+    
+    // Progress States
+    progress_perfect: "Crushed it! 🎉",
+    progress_perfect_sub: "You completed all habits",
+    progress_keep_going: "Keep the momentum!",
+    progress_keep_going_sub: "One step at a time",
+
+    // Categories
+    cat_health: "Health",
+    cat_social: "Social",
+    cat_growth: "Growth",
+    cat_mind: "Mind",
+    cat_work: "Work",
+    cat_energy: "Energy",
+
+    // Days
+    day_mon: "Mon",
+    day_tue: "Tue",
+    day_wed: "Wed",
+    day_thu: "Thu",
+    day_fri: "Fri",
+    day_sat: "Sat",
+    day_sun: "Sun",
+
+    // Stats & Profile
+    streak_label: "Current Streak",
+    days_in_row: "Days in a row",
+    total_label: "Total Completed",
+    habits_done: "Habits done",
+    profile_stats: "Profile & Stats",
+    profile_subtitle: "Your journey at a glance",
+    activity_history: "Activity History",
+    last_365: "Last 365 Days",
+    less: "Less",
+    more: "More",
+    challenges_title: "Challenges",
+    global_challenge: "Global Challenge",
+    consistency_master: "Consistency Master",
+    challenge_desc: "Complete 50 habits this month to unlock the badge",
+    view_progress: "View Progress",
+    new_badge: "New",
+
+    // Quick Start Presets
+    quick_start_title: "Quick Start",
+    quick_start_desc: "Choose a template to begin",
+    preset_diction: "Work on Diction",
+    preset_exercise: "20 min Exercise",
+    preset_read: "Read 10 pages",
+    preset_water: "Drink Water",
+    preset_meditation: "Meditation",
+    preset_no_sugar: "No Sugar"
   },
   ru: {
     greeting: "Привет",
@@ -91,7 +167,6 @@ const dictionaries: Record<Language, Translations> = {
     everyday: "Каждый день",
     swipeHint: "Свайп вправо для выполнения",
     theme: "Тема",
-    // New additions
     enableReminder: "Включить напоминание",
     colorHealth: "Здоровье",
     colorWork: "Работа",
@@ -101,7 +176,84 @@ const dictionaries: Record<Language, Translations> = {
     colorEnergy: "Энергия",
     setFor: "Повторять",
     remindAt: "Время",
-    category: "Категория"
+    category: "Категория",
+
+    // New I18n Keys
+    ready_to_start: "Готовы начать?",
+    one_step: "Шаг за шагом к цели",
+    weekly_focus: "Активность недели",
+    consistency_score: "Ваш уровень постоянства",
+    last_7_days: "За 7 дней",
+    habits_section_title: "Привычки",
+    done_count: "Выполнено",
+    create_habit_btn: "Создать привычку",
+    edit_habit: "Редактировать",
+    habit_title_label: "Название",
+    placeholder_title: "Напр. Чтение книг",
+    priority_label: "Приоритет",
+    priority_low: "Низкий",
+    priority_medium: "Средний",
+    priority_high: "Высокий",
+    category_label: "Категория",
+    enable_reminder: "Напоминание",
+    get_notified: "Уведомлять ежедневно",
+    remind_at: "Время",
+    save_habit: "Создать",
+    save_changes: "Сохранить",
+    delete_habit: "Удалить привычку",
+    confirm: "Подтвердить",
+    selected_date: "Выбрано",
+
+    // Progress States
+    progress_perfect: "Отлично! 🎉",
+    progress_perfect_sub: "Все привычки выполнены",
+    progress_keep_going: "Так держать!",
+    progress_keep_going_sub: "Продолжайте в том же духе",
+
+    // Categories
+    cat_health: "Здоровье",
+    cat_social: "Общение",
+    cat_growth: "Саморазвитие",
+    cat_mind: "Интеллект",
+    cat_work: "Работа",
+    cat_energy: "Энергия",
+    
+    // Days
+    day_mon: "Пн",
+    day_tue: "Вт",
+    day_wed: "Ср",
+    day_thu: "Чт",
+    day_fri: "Пт",
+    day_sat: "Сб",
+    day_sun: "Вс",
+
+    // Stats & Profile
+    streak_label: "Текущая серия",
+    days_in_row: "дней подряд",
+    total_label: "Всего выполнено",
+    habits_done: "привычек",
+    profile_stats: "Профиль",
+    profile_subtitle: "Ваш прогресс",
+    activity_history: "История активности",
+    last_365: "За год",
+    less: "Меньше",
+    more: "Больше",
+    challenges_title: "Вызовы",
+    global_challenge: "Глобальный вызов",
+    consistency_master: "Мастер дисциплины",
+    challenge_desc: "Выполни 50 привычек в этом месяце",
+    view_progress: "Смотреть прогресс",
+    new_badge: "Новое",
+
+    // Quick Start Presets
+    quick_start_title: "Быстрый старт",
+    quick_start_desc: "Выберите шаблон для начала",
+    preset_diction: "Работа над дикцией",
+    preset_exercise: "Зарядка 20 мин",
+    preset_read: "Чтение 10 страниц",
+    preset_water: "Пить воду",
+    preset_meditation: "Медитация",
+    preset_no_sugar: "Без сахара"
   }
 };
 

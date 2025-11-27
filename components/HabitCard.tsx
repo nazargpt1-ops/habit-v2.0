@@ -3,14 +3,16 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, useMotionValue } from 'framer-motion';
 import { Check, Droplet, Book, Activity, Moon, Star, Zap, Flame, Bell } from 'lucide-react';
 import { HabitWithCompletion, Habit } from '../types';
-import { cn } from '../lib/utils';
+import { cn, hexToRgba } from '../lib/utils';
 import confetti from 'canvas-confetti';
+import { useLanguage } from '../context/LanguageContext';
 
 interface HabitCardProps {
   habit: HabitWithCompletion;
   onToggle: (id: string) => void;
   onOpenDetails: (habit: HabitWithCompletion) => void;
   onUpdate: (id: string, updates: Partial<Habit>) => void;
+  onEdit: (habit: Habit) => void;
 }
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -22,21 +24,8 @@ const iconMap: Record<string, React.ReactNode> = {
   zap: <Zap size={24} strokeWidth={2.5} />,
 };
 
-// Helper to convert hex to rgba for pastel backgrounds
-const hexToRgba = (hex: string, alpha: number) => {
-    let c: any;
-    if(/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)){
-        c= hex.substring(1).split('');
-        if(c.length== 3){
-            c= [c[0], c[0], c[1], c[1], c[2], c[2]];
-        }
-        c= '0x'+c.join('');
-        return 'rgba('+[(c>>16)&255, (c>>8)&255, c&255].join(',')+','+alpha+')';
-    }
-    return hex;
-}
-
-export const HabitCard: React.FC<HabitCardProps> = ({ habit, onToggle, onOpenDetails, onUpdate }) => {
+export const HabitCard: React.FC<HabitCardProps> = ({ habit, onToggle, onOpenDetails, onUpdate, onEdit }) => {
+  const { t } = useLanguage();
   const x = useMotionValue(0);
   const [isEditingTime, setIsEditingTime] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -109,6 +98,16 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit, onToggle, onOpenDet
       }
   };
 
+  // Helper to get translated category
+  const getCategoryLabel = (cat: string) => {
+      let key = cat.toLowerCase();
+      // Simple normalization if needed, e.g. 'Mindfulness' -> 'mind'
+      if (key === 'mindfulness') key = 'mind';
+      
+      const tKey = ('cat_' + key) as keyof typeof t;
+      return t[tKey] || cat;
+  };
+
   return (
     <motion.div
       drag="x"
@@ -120,9 +119,9 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit, onToggle, onOpenDet
       className="relative mb-3 group touch-pan-y select-none"
     >
       <div 
-        onClick={() => onOpenDetails(habit)}
+        onClick={() => onEdit(habit)}
         className={cn(
-            "relative z-10 w-full p-4 flex items-center justify-between bg-white rounded-[24px] shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-transparent transition-all duration-300",
+            "relative z-10 w-full p-4 flex items-center justify-between bg-white rounded-[24px] shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-transparent transition-all duration-300 cursor-pointer",
             !habit.completed && "hover:shadow-[0_8px_25px_-6px_rgba(0,0,0,0.1)]",
             habit.completed ? "opacity-60 saturate-50" : "opacity-100"
         )}
@@ -161,7 +160,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit, onToggle, onOpenDet
             <div className="flex items-center flex-wrap gap-2">
               {/* Category Badge */}
               <span className="text-xs text-gray-500 font-semibold bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100">
-                {habit.category}
+                {getCategoryLabel(habit.category)}
               </span>
 
               {/* Reminder Badge (Interactive) */}

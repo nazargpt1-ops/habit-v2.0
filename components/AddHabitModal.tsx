@@ -1,28 +1,34 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Clock, Bell } from 'lucide-react';
+import { X, Clock, Bell, Trash2 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import { Priority, Translations } from '../types';
+import { Priority, Translations, Habit } from '../types';
 import { cn } from '../lib/utils';
 import { hapticImpact } from '../lib/telegram';
 
-interface AddHabitModalProps {
+interface HabitModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (title: string, priority: Priority, color: string, category: string, reminderTime?: string, reminderDate?: string, reminderDays?: string[]) => void;
+  onDelete?: () => void;
+  initialHabit?: Habit | null;
 }
 
-const COLOR_PALETTE: { color: string; labelKey: keyof Translations; category: string }[] = [
-  { color: '#60A5FA', labelKey: 'colorHealth', category: 'Health' }, // Blue
-  { color: '#F472B6', labelKey: 'colorSocial', category: 'Social' }, // Pink
-  { color: '#34D399', labelKey: 'colorGrowth', category: 'Growth' }, // Green
-  { color: '#A78BFA', labelKey: 'colorMind', category: 'Mindfulness' },   // Purple
-  { color: '#FBBF24', labelKey: 'colorWork', category: 'Work' },   // Yellow
-  { color: '#F87171', labelKey: 'colorEnergy', category: 'Energy' }, // Red
+const COLOR_PALETTE: { color: string; category: string }[] = [
+  { color: '#60A5FA', category: 'Health' }, // Blue
+  { color: '#F472B6', category: 'Social' }, // Pink
+  { color: '#34D399', category: 'Growth' }, // Green
+  { color: '#A78BFA', category: 'Mind' },   // Purple (Map 'Mindfulness' to 'Mind' for key consistency if needed, but dictionary has cat_mind)
+  { color: '#FBBF24', category: 'Work' },   // Yellow
+  { color: '#F87171', category: 'Energy' }, // Red
 ];
 
-export const AddHabitModal: React.FC<AddHabitModalProps> = ({ isOpen, onClose, onSave }) => {
+// Helper to handle Mind/Mindfulness discrepancy if exists, 
+// but here we just ensure categories match the `cat_` keys in Translations.
+// Dictionary keys: cat_health, cat_social, cat_growth, cat_mind, cat_work, cat_energy.
+
+export const AddHabitModal: React.FC<HabitModalProps> = ({ isOpen, onClose, onSave, onDelete, initialHabit }) => {
   const { t } = useLanguage();
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState<Priority>('medium');
@@ -32,11 +38,51 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({ isOpen, onClose, o
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [reminderTime, setReminderTime] = useState('09:00');
 
+  // Delete Confirmation State
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+
+  // Pre-fill state if editing
+  useEffect(() => {
+    if (isOpen && initialHabit) {
+      setTitle(initialHabit.title);
+      setPriority(initialHabit.priority);
+      
+      // Find matching color/category object
+      // Loose matching for category if naming changed
+      const foundColor = COLOR_PALETTE.find(
+        c => c.color === initialHabit.color || c.category === initialHabit.category || (initialHabit.category === 'Mindfulness' && c.category === 'Mind')
+      );
+      if (foundColor) setSelectedColorObj(foundColor);
+      
+      if (initialHabit.reminder_time) {
+        setReminderEnabled(true);
+        setReminderTime(initialHabit.reminder_time);
+      } else {
+        setReminderEnabled(false);
+      }
+      setIsConfirmingDelete(false);
+    } else if (isOpen && !initialHabit) {
+      // Reset for new habit
+      setTitle('');
+      setPriority('medium');
+      setSelectedColorObj(COLOR_PALETTE[0]);
+      setReminderEnabled(false);
+      setReminderTime('09:00');
+      setIsConfirmingDelete(false);
+    }
+  }, [isOpen, initialHabit]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
     hapticImpact('medium');
     
+    // Use the localized category name if we want to save it localized, 
+    // OR keep internal English key and translate on display. 
+    // Usually better to save English key (e.g. 'Health') to DB and translate on render.
+    // The current app saves the string from this object. 
+    // We will continue saving the "English" category key from the object for consistency in logic,
+    // but the UI displays the translation.
     const category = selectedColorObj.category;
 
     onSave(
@@ -45,16 +91,19 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({ isOpen, onClose, o
         selectedColorObj.color,
         category, 
         reminderEnabled ? reminderTime : undefined, 
-        undefined, // Date is optional/removed for now to focus on daily habits
+        undefined, 
         undefined
     );
     
-    // Reset
-    setTitle('');
-    setPriority('medium');
-    setReminderEnabled(false);
-    setReminderTime('09:00');
     onClose();
+  };
+
+  const isEditing = !!initialHabit;
+
+  const priorityKeys: Record<Priority, keyof Translations> = {
+    low: 'priority_low',
+    medium: 'priority_medium',
+    high: 'priority_high'
   };
 
   return (
@@ -79,7 +128,7 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({ isOpen, onClose, o
             {/* Header */}
             <div className="flex justify-between items-center p-6 border-b border-[var(--tg-theme-secondary-bg-color)]">
               <h2 className="text-xl font-bold text-[var(--tg-theme-text-color)]">
-                {t.newHabitTitle}
+                {isEditing ? t.edit_habit : t.create_habit_btn}
               </h2>
               <button onClick={onClose} className="p-2 rounded-full bg-[var(--tg-theme-secondary-bg-color)]">
                 <X size={20} className="text-[var(--tg-theme-hint-color)]" />
@@ -91,22 +140,22 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({ isOpen, onClose, o
               {/* Title Input */}
               <div className="space-y-3">
                 <label className="text-xs uppercase font-bold text-[var(--tg-theme-hint-color)] tracking-wider">
-                    {t.habitTitle}
+                    {t.habit_title_label}
                 </label>
                 <input
-                  autoFocus
+                  autoFocus={!isEditing}
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   className="w-full p-4 rounded-2xl bg-[var(--tg-theme-secondary-bg-color)] text-[var(--tg-theme-text-color)] text-xl font-medium border-none outline-none focus:ring-2 focus:ring-[var(--tg-theme-button-color)]/20 transition-all placeholder:text-[var(--tg-theme-hint-color)]/50"
-                  placeholder="e.g. Read Books"
+                  placeholder={t.placeholder_title}
                 />
               </div>
 
               {/* Priority Segmented Control */}
               <div className="space-y-3">
                  <label className="text-xs uppercase font-bold text-[var(--tg-theme-hint-color)] tracking-wider">
-                    {t.priority}
+                    {t.priority_label}
                  </label>
                  <div className="flex p-1 bg-[var(--tg-theme-secondary-bg-color)] rounded-xl">
                     {(['low', 'medium', 'high'] as Priority[]).map((p) => (
@@ -121,7 +170,7 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({ isOpen, onClose, o
                             : "text-[var(--tg-theme-hint-color)]"
                         )}
                       >
-                         {t[p]}
+                         {t[priorityKeys[p]]}
                       </button>
                     ))}
                   </div>
@@ -130,19 +179,22 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({ isOpen, onClose, o
               {/* Category (formerly Color) Selection - Scrollable Chips */}
               <div className="space-y-3">
                  <label className="text-xs uppercase font-bold text-[var(--tg-theme-hint-color)] tracking-wider">
-                    {t.category}
+                    {t.category_label}
                  </label>
                  
-                 <div className="flex gap-3 overflow-x-auto pb-4 -mx-6 px-6 no-scrollbar">
+                 <div className="flex flex-nowrap gap-3 overflow-x-auto pb-2 -mx-6 px-6 no-scrollbar">
                   {COLOR_PALETTE.map((cObj) => {
                       const isSelected = selectedColorObj.color === cObj.color;
+                      const categoryKey = ('cat_' + cObj.category.toLowerCase()) as keyof Translations;
+                      const label = t[categoryKey] || cObj.category;
+
                       return (
                         <button
                           key={cObj.color}
                           type="button"
                           onClick={() => setSelectedColorObj(cObj)}
                           className={cn(
-                            "flex items-center gap-2 px-4 py-3 rounded-2xl transition-all relative shrink-0",
+                            "flex items-center gap-2 px-4 py-3 rounded-2xl transition-all relative shrink-0 whitespace-nowrap",
                             isSelected 
                                 ? "text-white shadow-lg scale-105" 
                                 : "bg-[var(--tg-theme-secondary-bg-color)] text-[var(--tg-theme-text-color)]"
@@ -155,7 +207,7 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({ isOpen, onClose, o
                                 className={cn("w-3 h-3 rounded-full border border-white/50", isSelected ? "bg-white" : "")}
                                 style={{ backgroundColor: isSelected ? undefined : cObj.color }} 
                             />
-                            <span className="font-bold text-sm">{t[cObj.labelKey]}</span>
+                            <span className="font-bold text-sm">{label}</span>
                         </button>
                     );
                   })}
@@ -170,8 +222,8 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({ isOpen, onClose, o
                             <Bell size={20} fill={reminderEnabled ? "currentColor" : "none"} />
                         </div>
                         <div className="flex flex-col">
-                            <span className="font-bold text-[var(--tg-theme-text-color)]">{t.enableReminder}</span>
-                            <span className="text-xs text-[var(--tg-theme-hint-color)]">Get notified daily</span>
+                            <span className="font-bold text-[var(--tg-theme-text-color)]">{t.enable_reminder}</span>
+                            <span className="text-xs text-[var(--tg-theme-hint-color)]">{t.get_notified}</span>
                         </div>
                     </div>
                     
@@ -209,11 +261,10 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({ isOpen, onClose, o
                             <div className="flex items-center gap-3 p-4 bg-[var(--tg-theme-secondary-bg-color)] rounded-2xl border border-[var(--tg-theme-hint-color)]/10">
                                 <Clock size={20} className="text-[var(--tg-theme-hint-color)]" />
                                 <span className="text-sm font-semibold text-[var(--tg-theme-text-color)] flex-1">
-                                    {t.remindAt || "Remind at"}
+                                    {t.remind_at}
                                 </span>
                                 <div className="flex items-center justify-end">
                                   <div className="relative">
-                                    {/* Visual Fake Button / Wrapper */}
                                     <input
                                       type="time"
                                       value={reminderTime}
@@ -248,15 +299,58 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({ isOpen, onClose, o
             </div>
 
             {/* Footer / CTA */}
-            <div className="p-6 border-t border-[var(--tg-theme-secondary-bg-color)] bg-[var(--tg-theme-bg-color)]">
+            <div className="p-6 border-t border-[var(--tg-theme-secondary-bg-color)] bg-[var(--tg-theme-bg-color)] space-y-4">
                 <button
                   type="button"
                   onClick={handleSubmit}
                   disabled={!title.trim()}
                   className="w-full py-4 rounded-xl bg-[var(--tg-theme-button-color)] text-[var(--tg-theme-button-text-color)] font-bold text-lg shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100"
                 >
-                  {t.save}
+                  {isEditing ? t.save_changes : t.save_habit}
                 </button>
+                
+                {isEditing && onDelete && (
+                  <div className="flex flex-col gap-2">
+                    {!isConfirmingDelete ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setIsConfirmingDelete(true);
+                        }}
+                        className="w-full py-3 text-red-500 font-medium bg-red-50 hover:bg-red-100 rounded-xl transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Trash2 size={20} />
+                        {t.delete_habit}
+                      </button>
+                    ) : (
+                      <div className="flex gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setIsConfirmingDelete(false);
+                          }}
+                          className="flex-1 py-3 text-gray-600 font-medium bg-gray-100 rounded-xl"
+                        >
+                          {t.cancel}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            onDelete();
+                            onClose();
+                          }}
+                          className="flex-1 py-3 text-white font-bold bg-red-500 hover:bg-red-600 rounded-xl shadow-lg flex items-center justify-center gap-2"
+                        >
+                          <Trash2 size={20} />
+                          {t.confirm}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
             </div>
           </motion.div>
         </>

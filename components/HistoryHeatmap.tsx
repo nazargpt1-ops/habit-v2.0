@@ -68,10 +68,10 @@ export const HistoryHeatmap: React.FC<HistoryHeatmapProps> = ({ data }) => {
     <div className="w-full bg-white/60 backdrop-blur-xl rounded-[2.5rem] border border-white/50 shadow-xl p-6 relative overflow-hidden">
         <div className="mb-4 flex items-center justify-between">
             <h3 className="text-lg font-bold text-gray-800 tracking-tight flex items-center gap-2">
-                Activity History
+                {t.activity_history}
             </h3>
             <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded-md border border-blue-100">
-                Last 365 Days
+                {t.last_365}
             </span>
         </div>
         
@@ -97,14 +97,14 @@ export const HistoryHeatmap: React.FC<HistoryHeatmapProps> = ({ data }) => {
         
         {/* Legend */}
         <div className="mt-4 flex items-center justify-end gap-2 text-xs text-gray-400 font-medium">
-            <span>Less</span>
+            <span>{t.less}</span>
             <div className="flex gap-1">
                  <div className="w-3 h-3 rounded-[2px] bg-gray-100/50"></div>
                  <div className="w-3 h-3 rounded-[2px] bg-blue-200"></div>
                  <div className="w-3 h-3 rounded-[2px] bg-blue-400"></div>
                  <div className="w-3 h-3 rounded-[2px] bg-blue-600"></div>
             </div>
-            <span>More</span>
+            <span>{t.more}</span>
         </div>
     </div>
   );

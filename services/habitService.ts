@@ -229,6 +229,28 @@ export const updateHabit = async (habitId: string, updates: Partial<Habit>): Pro
     }
 };
 
+export const deleteHabit = async (habitId: string): Promise<boolean> => {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      // Supabase cascade delete handles completions if FK is set up correctly,
+      // otherwise manual delete might be needed. Assuming cascade:
+      const { error } = await supabase.from('habits').delete().eq('id', habitId);
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error(err);
+      return false;
+    }
+  } else {
+    // Mock Delete
+    await new Promise(r => setTimeout(r, 200));
+    MOCK_HABITS = MOCK_HABITS.filter(h => h.id !== habitId);
+    MOCK_COMPLETIONS = MOCK_COMPLETIONS.filter(c => c.habit_id !== habitId);
+    CACHED_MOCK_HISTORY = CACHED_MOCK_HISTORY.filter(c => c.habit_id !== habitId);
+    return true;
+  }
+};
+
 export const toggleHabitCompletion = async (habitId: string, date: Date, isCompleted: boolean, existingCompletionId?: string, note?: string): Promise<{ success: boolean, newId?: string }> => {
   const dateKey = formatDateKey(date);
 

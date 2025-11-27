@@ -1,15 +1,17 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar as CalendarIcon } from 'lucide-react';
+import { Calendar as CalendarIcon, Inbox } from 'lucide-react';
 import { CalendarStrip } from '../components/CalendarStrip';
 import { HabitCard } from '../components/HabitCard';
 import { HabitDetailsModal } from '../components/HabitDetailsModal';
 import { CircularProgress } from '../components/CircularProgress';
 import { WeeklyChart } from '../components/WeeklyChart';
+import { HabitSuggestions, PresetHabit } from '../components/HabitSuggestions';
+import { AddHabitModal } from '../components/AddHabitModal';
 import { useLanguage } from '../context/LanguageContext';
-import { fetchHabitsWithCompletions, toggleHabitCompletion, fetchWeeklyStats, updateHabit } from '../services/habitService';
-import { HabitWithCompletion, Habit } from '../types';
+import { fetchHabitsWithCompletions, toggleHabitCompletion, fetchWeeklyStats, updateHabit, createHabit, deleteHabit } from '../services/habitService';
+import { HabitWithCompletion, Habit, Priority } from '../types';
 import { getTelegramUser, hapticImpact, hapticSuccess } from '../lib/telegram';
 import confetti from 'canvas-confetti';
 
@@ -26,8 +28,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   
   // Details Modal State
-  const [selectedHabit, setSelectedHabit] = useState<HabitWithCompletion | null>(null);
+  const [selectedHabitDetails, setSelectedHabitDetails] = useState<HabitWithCompletion | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+
+  // Edit/Add Modal State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
+
+  // Suggestions State
+  const [isSuggestionsDismissed, setIsSuggestionsDismissed] = useState(false);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -118,14 +127,81 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
       await updateHabit(id, updates);
   };
 
+  const handleQuickAdd = async (preset: PresetHabit) => {
+    const user = getTelegramUser();
+    // Create habit
+    await createHabit(
+      user.id, 
+      preset.title, 
+      preset.priority, 
+      preset.color, 
+      preset.category,
+      undefined, 
+      undefined, 
+      undefined
+    );
+    // Reload data - this will cause habits.length > 0, triggering exit animation for suggestions
+    loadData();
+  };
+
   const openDetails = (habit: HabitWithCompletion) => {
-      setSelectedHabit(habit);
+      setSelectedHabitDetails(habit);
       setIsDetailsOpen(true);
   };
 
+  const handleEditHabit = (habit: Habit) => {
+    setEditingHabit(habit);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveHabit = async (title: string, priority: Priority, color: string, category: string, reminderTime?: string, reminderDate?: string, reminderDays?: string[]) => {
+    const user = getTelegramUser();
+    
+    if (editingHabit) {
+      // Update existing
+      await updateHabit(editingHabit.id, {
+        title,
+        priority,
+        color,
+        category,
+        reminder_time: reminderTime,
+        reminder_date: reminderDate,
+        reminder_days: reminderDays
+      });
+    } else {
+      // Create new
+      await createHabit(user.id, title, priority, color, category, reminderTime, reminderDate, reminderDays);
+    }
+    
+    loadData();
+    setIsEditModalOpen(false);
+    setEditingHabit(null);
+  };
+
+  const handleDeleteHabit = async (id: string) => {
+    // 1. Delete from DB/Service
+    await deleteHabit(id);
+    
+    // 2. IMMEDIATE UI UPDATE (Filter out the deleted habit)
+    setHabits((prevHabits) => prevHabits.filter((h) => h.id !== id));
+    
+    // 3. Close Modal
+    setIsEditModalOpen(false);
+    setEditingHabit(null);
+  };
+
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false);
+    setEditingHabit(null);
+  };
+
   // Date formatting for Header
-  const dateString = selectedDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+  // Note: We might want to use localized date formatter later, but for now simple locale works
+  const locale = language === 'ru' ? 'ru-RU' : 'en-US';
+  const dateString = selectedDate.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
   const isToday = selectedDate.toDateString() === new Date().toDateString();
+
+  const showSuggestions = !isLoading && habits.length === 0 && !isSuggestionsDismissed;
 
   return (
     <div className="flex flex-col h-full w-full bg-[#FAFAFA] text-gray-900 font-sans relative overflow-hidden">
@@ -146,9 +222,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
            <div className="flex justify-between items-start mb-6">
               <div>
                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
-                   {isToday ? t.today : 'Selected'}
+                   {isToday ? t.today : t.selected_date}
                  </p>
-                 <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight leading-none">
+                 <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight leading-none capitalize">
                    {dateString}
                  </h1>
               </div>
@@ -197,12 +273,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
                   className="mt-6 flex flex-col items-center text-center"
                >
                   <p className="text-gray-900 font-bold text-xl tracking-tight">
-                     {progressPercentage === 0 ? "Ready to start?" : 
-                      progressPercentage === 100 ? "Crushed it! 🎉" : 
-                      "Keep the momentum!"}
+                     {progressPercentage === 0 ? t.ready_to_start : 
+                      progressPercentage === 100 ? t.progress_perfect : 
+                      t.progress_keep_going}
                   </p>
                   <p className="text-gray-500 text-sm font-medium mt-1">
-                     {progressPercentage === 100 ? "You completed all habits" : "One step at a time"}
+                     {progressPercentage === 100 ? t.progress_perfect_sub : t.progress_keep_going_sub}
                   </p>
                </motion.div>
            </div>
@@ -211,10 +287,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
         {/* Habit List */}
         <section className="px-5">
              <div className="flex justify-between items-end mb-4 px-2">
-                 <h2 className="text-xl font-extrabold text-gray-800 tracking-tight">{t.habitsTab}</h2>
-                 <span className="text-xs font-bold bg-white/80 backdrop-blur text-blue-600 px-3 py-1.5 rounded-full shadow-sm border border-blue-50/50">
-                    {habits.filter(h => h.completed).length} / {habits.length} Done
-                 </span>
+                 <h2 className="text-xl font-extrabold text-gray-800 tracking-tight">{t.habits_section_title}</h2>
+                 {habits.length > 0 && (
+                   <span className="text-xs font-bold bg-white/80 backdrop-blur text-blue-600 px-3 py-1.5 rounded-full shadow-sm border border-blue-50/50">
+                      {habits.filter(h => h.completed).length} / {habits.length} {t.done_count}
+                   </span>
+                 )}
              </div>
 
             {isLoading ? (
@@ -224,8 +302,42 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
                  ))}
               </div>
             ) : (
-              <AnimatePresence mode='popLayout'>
-                {sortedHabits.length > 0 ? (
+              <div className="flex flex-col gap-4">
+                
+                {/* Conditional Suggestions Block */}
+                <AnimatePresence>
+                  {showSuggestions && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, height: 'auto', scale: 1 }}
+                      exit={{ opacity: 0, height: 0, scale: 0.9, marginBottom: 0 }}
+                      transition={{ duration: 0.4, type: "spring", bounce: 0 }}
+                      className="overflow-hidden mb-2 origin-top"
+                    >
+                       <HabitSuggestions 
+                          onAdd={handleQuickAdd} 
+                          onClose={() => setIsSuggestionsDismissed(true)} 
+                       />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                
+                {/* Empty State Fallback (If suggestions dismissed) */}
+                {habits.length === 0 && isSuggestionsDismissed && (
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="py-12 flex flex-col items-center justify-center text-center p-4 border-2 border-dashed border-gray-200 rounded-[2rem]"
+                  >
+                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center text-gray-300 mb-4">
+                      <Inbox size={32} />
+                    </div>
+                    <p className="text-gray-500 font-medium">{t.noHabits}</p>
+                    <p className="text-gray-400 text-xs mt-1">Tap the + button to create one</p>
+                  </motion.div>
+                )}
+
+                <AnimatePresence mode='popLayout'>
                   <div className="space-y-3">
                     {sortedHabits.map((habit) => (
                       <HabitCard 
@@ -234,34 +346,37 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
                         onToggle={handleToggle} 
                         onOpenDetails={openDetails}
                         onUpdate={handleUpdateHabit}
+                        onEdit={handleEditHabit}
                       />
                     ))}
                   </div>
-                ) : (
-                  <motion.div 
-                    initial={{ opacity: 0 }} 
-                    animate={{ opacity: 1 }}
-                    className="flex flex-col items-center justify-center py-10 opacity-50"
-                  >
-                    <div className="w-16 h-16 bg-gray-200 rounded-full mb-4 animate-pulse" />
-                    <p className="text-gray-400 font-medium">{t.noHabits}</p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                </AnimatePresence>
+              </div>
             )}
         </section>
 
-        {/* Weekly Overview Chart */}
-        <section className="px-5 pb-4">
-            <WeeklyChart data={weeklyStats} />
-        </section>
+        {/* Weekly Overview Chart - Only show if we have habits, otherwise keep UI clean */}
+        {habits.length > 0 && (
+          <section className="px-5 pb-4">
+              <WeeklyChart data={weeklyStats} />
+          </section>
+        )}
 
       </div>
 
       <HabitDetailsModal
         isOpen={isDetailsOpen}
         onClose={() => setIsDetailsOpen(false)}
-        habit={selectedHabit}
+        habit={selectedHabitDetails}
+      />
+      
+      {/* Edit Modal - Reusing AddHabitModal */}
+      <AddHabitModal 
+        isOpen={isEditModalOpen} 
+        onClose={handleCloseEditModal} 
+        onSave={handleSaveHabit}
+        onDelete={() => editingHabit && handleDeleteHabit(editingHabit.id)}
+        initialHabit={editingHabit}
       />
     </div>
   );
