@@ -1,7 +1,11 @@
 
+
 export interface User {
   telegram_id: number;
   username: string;
+  first_name?: string;
+  last_name?: string;
+  language_code?: string;
 }
 
 export type Priority = 'high' | 'medium' | 'low';

@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar as CalendarIcon, Inbox } from 'lucide-react';
@@ -16,9 +17,7 @@ import {
   fetchWeeklyStats, 
   updateHabit, 
   createHabit, 
-  deleteHabit,
-  ensureUserExists,
-  getCurrentUserId
+  deleteHabit
 } from '../services/habitService';
 import { HabitWithCompletion, Habit, Priority } from '../types';
 import { hapticImpact, hapticSuccess } from '../lib/telegram';
@@ -49,16 +48,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
-    
-    // 1. Ensure user exists in SQL before fetching to avoid FK errors
-    await ensureUserExists();
-    
-    // 2. Get ID (Real or Test)
-    const userId = getCurrentUserId();
-    
-    // 3. Fetch Data
-    const data = await fetchHabitsWithCompletions(userId, selectedDate);
-    const stats = await fetchWeeklyStats(userId);
+    // Service handles user existence check internally
+    const data = await fetchHabitsWithCompletions(selectedDate);
+    const stats = await fetchWeeklyStats();
     
     setHabits(data);
     setWeeklyStats(stats);
@@ -143,9 +135,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
   };
 
   const handleQuickAdd = async (preset: PresetHabit) => {
-    const userId = getCurrentUserId();
     await createHabit(
-      userId, 
       preset.title, 
       preset.priority, 
       preset.color, 
@@ -168,8 +158,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
   };
 
   const handleSaveHabit = async (title: string, priority: Priority, color: string, category: string, reminderTime?: string, reminderDate?: string, reminderDays?: string[]) => {
-    const userId = getCurrentUserId();
-    
     if (editingHabit) {
       // Update existing
       await updateHabit(editingHabit.id, {
@@ -183,7 +171,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
       });
     } else {
       // Create new
-      await createHabit(userId, title, priority, color, category, reminderTime, reminderDate, reminderDays);
+      await createHabit(title, priority, color, category, reminderTime, reminderDate, reminderDays);
     }
     
     loadData();

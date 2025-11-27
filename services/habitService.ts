@@ -1,11 +1,11 @@
 
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
-import { Habit, Completion, HabitWithCompletion, Priority, User } from '../types';
+import { Habit, Completion, HabitWithCompletion, Priority } from '../types';
 import { formatDateKey } from '../lib/utils';
-import { getTelegramUser } from '../lib/telegram';
 
-// --- CONSTANTS ---
-const TEST_USER_ID = 123456789; // Fixed ID for local development
+const TEST_USER_ID = 99999999;
+// Simple in-memory cache to avoid hitting the DB for user verification on every single request
+let hasVerifiedUser = false;
 
 // --- HELPERS ---
 
@@ -14,25 +14,28 @@ const TEST_USER_ID = 123456789; // Fixed ID for local development
  * Prioritizes Telegram WebApp ID, falls back to static test ID for development.
  */
 export const getCurrentUserId = (): number => {
+  let userId = TEST_USER_ID;
+  
   if (typeof window !== 'undefined' && window.Telegram?.WebApp?.initDataUnsafe?.user?.id) {
-    return window.Telegram.WebApp.initDataUnsafe.user.id;
+    userId = window.Telegram.WebApp.initDataUnsafe.user.id;
+    console.log("[HabitService] Detected Telegram User ID:", userId);
+  } else {
+    console.log("[HabitService] No Telegram detected. Using Test User ID:", userId);
   }
-  return TEST_USER_ID;
+  
+  return userId;
 };
 
 /**
  * Calculates the current streak based on completion history.
- * Checks for continuity starting from today or yesterday.
  */
 const calculateStreak = (completions: Completion[]): number => {
   if (!completions || completions.length === 0) return 0;
 
-  // Sort dates descending (newest first)
   const sortedDates = completions
     .map(c => c.date)
     .sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
 
-  // Unique dates only
   const uniqueDates = Array.from(new Set(sortedDates));
   if (uniqueDates.length === 0) return 0;
 
@@ -41,8 +44,6 @@ const calculateStreak = (completions: Completion[]): number => {
   yesterday.setDate(yesterday.getDate() - 1);
   const yesterdayStr = formatDateKey(yesterday);
 
-  // Check if the streak is active (completed today OR yesterday)
-  // If the most recent completion is before yesterday, streak is broken -> 0
   const lastCompletion = uniqueDates[0];
   if (lastCompletion !== todayStr && lastCompletion !== yesterdayStr) {
     return 0;
@@ -51,20 +52,16 @@ const calculateStreak = (completions: Completion[]): number => {
   let streak = 0;
   let currentCheckDate = new Date();
 
-  // If not completed today, start checking from yesterday
   if (lastCompletion !== todayStr) {
     currentCheckDate.setDate(currentCheckDate.getDate() - 1);
   }
 
-  // Iterate backwards
   for (let i = 0; i < uniqueDates.length; i++) {
     const checkStr = formatDateKey(currentCheckDate);
     if (uniqueDates.includes(checkStr)) {
       streak++;
-      // Move to previous day
       currentCheckDate.setDate(currentCheckDate.getDate() - 1);
     } else {
-      // Gap found
       break;
     }
   }
@@ -76,49 +73,57 @@ const calculateStreak = (completions: Completion[]): number => {
 
 /**
  * Ensures the user exists in the 'users' table.
- * Must be called before creating habits to ensure Foreign Key integrity.
+ * Should be called internally by other service functions.
  */
 export const ensureUserExists = async (): Promise<boolean> => {
+  if (hasVerifiedUser) return true;
   if (!isSupabaseConfigured || !supabase) {
-    console.warn("Supabase not configured. skipping user check.");
-    return true;
+    console.warn("[HabitService] Supabase not configured. Skipping user check.");
+    return true; // Proceed for mock mode logic if needed
   }
 
-  const telegramUser = getTelegramUser();
   const userId = getCurrentUserId();
+  const tgUser = typeof window !== 'undefined' ? window.Telegram?.WebApp?.initDataUnsafe?.user : undefined;
+
+  // Prepare user data for Upsert
+  const userData = {
+    telegram_id: userId,
+    username: tgUser?.username || `user_${userId}`,
+    first_name: tgUser?.first_name || 'Unknown',
+    last_name: tgUser?.last_name || '',
+    language_code: tgUser?.language_code || 'en'
+  };
 
   try {
-    const userData: Partial<User> = {
-      telegram_id: userId,
-      username: telegramUser?.username || `user_${userId}`,
-    };
-
-    // Upsert: Insert if new, Update if exists
     const { error } = await supabase
       .from('users')
       .upsert(userData, { onConflict: 'telegram_id' });
 
     if (error) {
-      console.error("Error ensuring user exists:", error);
+      console.error("[HabitService] Error ensuring user exists (Upsert failed):", error);
       return false;
     }
+
+    hasVerifiedUser = true;
     return true;
   } catch (err) {
-    console.error("Critical error in ensureUserExists:", err);
+    console.error("[HabitService] Critical exception in ensureUserExists:", err);
     return false;
   }
 };
 
 /**
- * Fetches habits and links them with today's completion status and calculated streaks.
+ * Fetches habits and links them with today's completion status.
  */
-export const fetchHabitsWithCompletions = async (userId: number, date: Date): Promise<HabitWithCompletion[]> => {
-  const dateKey = formatDateKey(date);
-  
-  // Return empty array if no Supabase (or handle mock fallback differently if desired)
+export const fetchHabitsWithCompletions = async (date: Date): Promise<HabitWithCompletion[]> => {
   if (!isSupabaseConfigured || !supabase) return [];
-
+  
   try {
+    const userId = getCurrentUserId();
+    await ensureUserExists();
+
+    const dateKey = formatDateKey(date);
+
     // 1. Fetch Habits
     const { data: habits, error: habitsError } = await supabase
       .from('habits')
@@ -127,11 +132,13 @@ export const fetchHabitsWithCompletions = async (userId: number, date: Date): Pr
       .eq('is_archived', false)
       .order('created_at', { ascending: true });
 
-    if (habitsError) throw habitsError;
+    if (habitsError) {
+        console.error("[HabitService] Error fetching habits:", habitsError);
+        throw habitsError;
+    }
     if (!habits || habits.length === 0) return [];
 
-    // 2. Fetch ALL completions for these habits to calculate stats locally
-    // (Optimized: In a massive app, we'd limit this range or use SQL views)
+    // 2. Fetch Completions
     const habitIds = habits.map(h => h.id);
     const { data: completions, error: completionsError } = await supabase
       .from('completions')
@@ -155,7 +162,7 @@ export const fetchHabitsWithCompletions = async (userId: number, date: Date): Pr
     });
 
   } catch (err) {
-    console.error("Error fetching habits:", err);
+    console.error("[HabitService] fetchHabitsWithCompletions failed:", err);
     return [];
   }
 };
@@ -179,7 +186,6 @@ export const fetchHabitHistory = async (habitId: string): Promise<Completion[]> 
  * Creates a new habit in the database.
  */
 export const createHabit = async (
-  userId: number, 
   title: string, 
   priority: Priority, 
   color: string, 
@@ -191,6 +197,9 @@ export const createHabit = async (
   if (!isSupabaseConfigured || !supabase) return null;
 
   try {
+    const userId = getCurrentUserId();
+    await ensureUserExists();
+
     const { data, error } = await supabase
       .from('habits')
       .insert({
@@ -199,7 +208,7 @@ export const createHabit = async (
         category,
         priority,
         color,
-        icon: 'star', // Default icon, logic could be expanded
+        icon: 'star',
         reminder_time: reminderTime,
         reminder_date: reminderDate,
         reminder_days: reminderDays,
@@ -208,10 +217,13 @@ export const createHabit = async (
       .select()
       .single();
     
-    if (error) throw error;
+    if (error) {
+        console.error("[HabitService] Supabase Error creating habit:", error);
+        throw error;
+    }
     return data;
   } catch (err) {
-    console.error("Error creating habit:", err);
+    console.error("[HabitService] Exception creating habit:", err);
     return null;
   }
 };
@@ -231,13 +243,13 @@ export const updateHabit = async (habitId: string, updates: Partial<Habit>): Pro
     if (error) throw error;
     return true;
   } catch (err) {
-    console.error("Error updating habit:", err);
+    console.error("[HabitService] Error updating habit:", err);
     return false;
   }
 };
 
 /**
- * Deletes a habit (and relies on CASCADE for completions).
+ * Deletes a habit.
  */
 export const deleteHabit = async (habitId: string): Promise<boolean> => {
   if (!isSupabaseConfigured || !supabase) return false;
@@ -251,14 +263,13 @@ export const deleteHabit = async (habitId: string): Promise<boolean> => {
     if (error) throw error;
     return true;
   } catch (err) {
-    console.error("Error deleting habit:", err);
+    console.error("[HabitService] Error deleting habit:", err);
     return false;
   }
 };
 
 /**
  * Toggles completion status. 
- * INSERTs if marking done, DELETEs if marking undone.
  */
 export const toggleHabitCompletion = async (
   habitId: string, 
@@ -269,12 +280,12 @@ export const toggleHabitCompletion = async (
 ): Promise<{ success: boolean, newId?: string }> => {
   if (!isSupabaseConfigured || !supabase) return { success: false };
 
+  // Note: We don't check ensureUserExists here for speed, assuming fetching habits worked.
   const dateKey = formatDateKey(date);
 
   try {
     if (isCompleted) {
-      // Check if already exists to avoid duplicate constraint errors
-      // (Though UI should prevent this, race conditions happen)
+      // Check existing to prevent duplicates
       const { data: existing } = await supabase
          .from('completions')
          .select('id')
@@ -298,9 +309,8 @@ export const toggleHabitCompletion = async (
       if (error) throw error;
       return { success: true, newId: data.id };
     } else {
-      // Delete completion
       if (!existingCompletionId) {
-          // If we don't have the ID, try to find it by composite key
+          // Fallback delete by composite key
           const { error: deleteError } = await supabase
             .from('completions')
             .delete()
@@ -320,14 +330,11 @@ export const toggleHabitCompletion = async (
       return { success: true };
     }
   } catch (err) {
-    console.error("Error toggling completion:", err);
+    console.error("[HabitService] Error toggling completion:", err);
     return { success: false };
   }
 };
 
-/**
- * Updates the note on a specific completion record.
- */
 export const updateCompletionNote = async (completionId: string, note: string) => {
   if (!isSupabaseConfigured || !supabase) return;
   await supabase.from('completions').update({ note }).eq('id', completionId);
@@ -335,19 +342,18 @@ export const updateCompletionNote = async (completionId: string, note: string) =
 
 // --- STATISTICS SERVICES ---
 
-/**
- * Calculates weekly activity counts for the last 7 days.
- */
-export const fetchWeeklyStats = async (userId: number): Promise<{ day: string; count: number }[]> => {
+export const fetchWeeklyStats = async (): Promise<{ day: string; count: number }[]> => {
   if (!isSupabaseConfigured || !supabase) return [];
 
+  const userId = getCurrentUserId();
   const today = new Date();
   const sevenDaysAgo = new Date(today);
   sevenDaysAgo.setDate(today.getDate() - 6);
   const startDateStr = formatDateKey(sevenDaysAgo);
 
   try {
-    // Get all habits for user to filter completions
+    await ensureUserExists();
+
     const { data: habits } = await supabase
       .from('habits')
       .select('id')
@@ -357,7 +363,6 @@ export const fetchWeeklyStats = async (userId: number): Promise<{ day: string; c
     
     const habitIds = habits.map(h => h.id);
 
-    // Fetch completions in range
     const { data: completions } = await supabase
       .from('completions')
       .select('date')
@@ -369,14 +374,11 @@ export const fetchWeeklyStats = async (userId: number): Promise<{ day: string; c
         counts[c.date] = (counts[c.date] || 0) + 1;
     });
 
-    // Format output for Mon-Sun or Relative 7 days
-    // We'll use the next 7 days logic from the chart component, or return actual days
     const result = [];
     for(let i = 0; i < 7; i++) {
         const d = new Date(sevenDaysAgo);
         d.setDate(d.getDate() + i);
         const k = formatDateKey(d);
-        // Returns "Mon", "Tue" etc.
         const dayName = d.toLocaleDateString('en-US', { weekday: 'short' }); 
         result.push({ day: dayName, count: counts[k] || 0 });
     }
@@ -384,7 +386,7 @@ export const fetchWeeklyStats = async (userId: number): Promise<{ day: string; c
     return result;
 
   } catch (err) {
-    console.error("Error fetching weekly stats:", err);
+    console.error("[HabitService] Error fetching weekly stats:", err);
     return [];
   }
 };
@@ -395,16 +397,16 @@ export interface HeatmapData {
   level: number;
 }
 
-/**
- * Fetches all time heatmap data and aggregates totals.
- */
-export const fetchHeatmapData = async (userId: number): Promise<{ heatmap: HeatmapData[], totalCompletions: number, currentStreak: number }> => {
+export const fetchHeatmapData = async (): Promise<{ heatmap: HeatmapData[], totalCompletions: number, currentStreak: number }> => {
   if (!isSupabaseConfigured || !supabase) {
       return { heatmap: [], totalCompletions: 0, currentStreak: 0 };
   }
 
   try {
-      // 1. Get User Habits
+      const userId = getCurrentUserId();
+      await ensureUserExists();
+
+      // 1. Habits
       const { data: habits } = await supabase
         .from('habits')
         .select('id')
@@ -416,7 +418,7 @@ export const fetchHeatmapData = async (userId: number): Promise<{ heatmap: Heatm
       
       const habitIds = habits.map(h => h.id);
 
-      // 2. Get All Completions
+      // 2. All Completions
       const { data: completions } = await supabase
         .from('completions')
         .select('date')
@@ -424,13 +426,11 @@ export const fetchHeatmapData = async (userId: number): Promise<{ heatmap: Heatm
       
       const safeCompletions = completions || [];
 
-      // 3. Aggregate Counts
+      // 3. Aggregate
       const counts: Record<string, number> = {};
-      const distinctDates = new Set<string>();
-
+      
       safeCompletions.forEach(c => {
           counts[c.date] = (counts[c.date] || 0) + 1;
-          distinctDates.add(c.date);
       });
 
       // 4. Build Heatmap (Last 365 Days)
@@ -453,13 +453,11 @@ export const fetchHeatmapData = async (userId: number): Promise<{ heatmap: Heatm
            heatmap.push({ date: key, count, level });
       }
 
-      // 5. Calculate Global Daily Streak
-      // (Days in a row where AT LEAST ONE habit was done)
+      // 5. Global Streak
       let currentStreak = 0;
       let checkDate = new Date(today);
       let checkKey = formatDateKey(checkDate);
       
-      // If nothing done today, check yesterday to start streak count
       if (!counts[checkKey]) {
           checkDate.setDate(checkDate.getDate() - 1);
           checkKey = formatDateKey(checkDate);
@@ -486,7 +484,7 @@ export const fetchHeatmapData = async (userId: number): Promise<{ heatmap: Heatm
       };
 
   } catch (err) {
-      console.error("Error fetching heatmap:", err);
+      console.error("[HabitService] Error fetching heatmap:", err);
       return { heatmap: [], totalCompletions: 0, currentStreak: 0 };
   }
 };

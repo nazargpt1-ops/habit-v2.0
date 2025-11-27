@@ -1,8 +1,8 @@
 
+
 import React, { useEffect, useState } from 'react';
 import { HistoryHeatmap } from '../components/HistoryHeatmap';
 import { useLanguage } from '../context/LanguageContext';
-import { getTelegramUser } from '../lib/telegram';
 import { fetchHeatmapData, HeatmapData } from '../services/habitService';
 import { Trophy, Flame, CheckCircle2, TrendingUp, Share2 } from 'lucide-react';
 
@@ -16,8 +16,8 @@ export const Statistics: React.FC = () => {
   useEffect(() => {
     const loadStats = async () => {
       setIsLoading(true);
-      const user = getTelegramUser();
-      const { heatmap, totalCompletions, currentStreak } = await fetchHeatmapData(user.id);
+      // Service determines user context internally
+      const { heatmap, totalCompletions, currentStreak } = await fetchHeatmapData();
       setHeatmapData(heatmap);
       setTotalCompletions(totalCompletions);
       setCurrentStreak(currentStreak);
