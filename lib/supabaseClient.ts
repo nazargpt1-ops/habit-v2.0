@@ -9,8 +9,9 @@ const getEnvVar = (key: string, legacyKey?: string): string => {
   // 1. Try import.meta.env (Vite standard)
   try {
     // We strictly check if import.meta.env exists before accessing it to prevent TypeError
-    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
-      value = String(import.meta.env[key]);
+    // Cast import.meta to any because standard ImportMeta interface doesn't include env (needs vite/client types)
+    if (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env[key]) {
+      value = String((import.meta as any).env[key]);
     }
   } catch (e) {
     // Ignore errors in environments where import.meta is not supported

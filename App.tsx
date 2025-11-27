@@ -1,14 +1,15 @@
+
 import React, { useEffect, useState } from 'react';
 import { Dashboard } from './pages/Dashboard';
 import { Statistics } from './pages/Statistics';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
-import { initTelegramApp, getTelegramUser } from './lib/telegram';
+import { initTelegramApp } from './lib/telegram';
 import { Tab, Priority } from './types';
 import { LayoutGrid, BarChart3, Plus } from 'lucide-react';
 import { cn } from './lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AddHabitModal } from './components/AddHabitModal';
-import { createHabit } from './services/habitService';
+import { createHabit, ensureUserExists, getCurrentUserId } from './services/habitService';
 
 // Inner component to use Language Context
 const AppContent = () => {
@@ -22,8 +23,9 @@ const AppContent = () => {
   }, []);
 
   const handleSaveHabit = async (title: string, priority: Priority, color: string, category: string, reminderTime?: string, reminderDate?: string, reminderDays?: string[]) => {
-    const user = getTelegramUser();
-    await createHabit(user.id, title, priority, color, category, reminderTime, reminderDate, reminderDays);
+    await ensureUserExists();
+    const userId = getCurrentUserId();
+    await createHabit(userId, title, priority, color, category, reminderTime, reminderDate, reminderDays);
     setLastUpdated(Date.now()); // Trigger refresh in Dashboard
     setIsModalOpen(false);
   };

@@ -10,9 +10,18 @@ import { WeeklyChart } from '../components/WeeklyChart';
 import { HabitSuggestions, PresetHabit } from '../components/HabitSuggestions';
 import { AddHabitModal } from '../components/AddHabitModal';
 import { useLanguage } from '../context/LanguageContext';
-import { fetchHabitsWithCompletions, toggleHabitCompletion, fetchWeeklyStats, updateHabit, createHabit, deleteHabit } from '../services/habitService';
+import { 
+  fetchHabitsWithCompletions, 
+  toggleHabitCompletion, 
+  fetchWeeklyStats, 
+  updateHabit, 
+  createHabit, 
+  deleteHabit,
+  ensureUserExists,
+  getCurrentUserId
+} from '../services/habitService';
 import { HabitWithCompletion, Habit, Priority } from '../types';
-import { getTelegramUser, hapticImpact, hapticSuccess } from '../lib/telegram';
+import { hapticImpact, hapticSuccess } from '../lib/telegram';
 import confetti from 'canvas-confetti';
 
 interface DashboardProps {
@@ -40,9 +49,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
-    const user = getTelegramUser();
-    const data = await fetchHabitsWithCompletions(user.id, selectedDate);
-    const stats = await fetchWeeklyStats(user.id);
+    
+    // 1. Ensure user exists in SQL before fetching to avoid FK errors
+    await ensureUserExists();
+    
+    // 2. Get ID (Real or Test)
+    const userId = getCurrentUserId();
+    
+    // 3. Fetch Data
+    const data = await fetchHabitsWithCompletions(userId, selectedDate);
+    const stats = await fetchWeeklyStats(userId);
+    
     setHabits(data);
     setWeeklyStats(stats);
     setIsLoading(false);
@@ -92,12 +109,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
     setHabits(updatedHabits);
 
     // 2. Celebration Effect (Confetti)
-    // Check if ALL habits are completed after this toggle
     const totalHabits = updatedHabits.length;
     const completedCount = updatedHabits.filter(h => h.completed).length;
     
     if (newStatus && totalHabits > 0 && completedCount === totalHabits) {
-        // Fire confetti from bottom center
         confetti({
             particleCount: 150,
             spread: 100,
@@ -128,10 +143,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
   };
 
   const handleQuickAdd = async (preset: PresetHabit) => {
-    const user = getTelegramUser();
-    // Create habit
+    const userId = getCurrentUserId();
     await createHabit(
-      user.id, 
+      userId, 
       preset.title, 
       preset.priority, 
       preset.color, 
@@ -140,7 +154,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
       undefined, 
       undefined
     );
-    // Reload data - this will cause habits.length > 0, triggering exit animation for suggestions
     loadData();
   };
 
@@ -155,7 +168,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
   };
 
   const handleSaveHabit = async (title: string, priority: Priority, color: string, category: string, reminderTime?: string, reminderDate?: string, reminderDays?: string[]) => {
-    const user = getTelegramUser();
+    const userId = getCurrentUserId();
     
     if (editingHabit) {
       // Update existing
@@ -170,7 +183,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
       });
     } else {
       // Create new
-      await createHabit(user.id, title, priority, color, category, reminderTime, reminderDate, reminderDays);
+      await createHabit(userId, title, priority, color, category, reminderTime, reminderDate, reminderDays);
     }
     
     loadData();
@@ -196,7 +209,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
   };
 
   // Date formatting for Header
-  // Note: We might want to use localized date formatter later, but for now simple locale works
   const locale = language === 'ru' ? 'ru-RU' : 'en-US';
   const dateString = selectedDate.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
   const isToday = selectedDate.toDateString() === new Date().toDateString();
