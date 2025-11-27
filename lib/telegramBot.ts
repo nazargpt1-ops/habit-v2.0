@@ -1,33 +1,7 @@
-
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+// This utility was used for server-side Telegram Bot API calls.
+// Since migrating to Vite (client-side), direct access to process.env.TELEGRAM_BOT_TOKEN is unsafe and removed.
+// Move this logic to a secure backend or Edge Function.
 
 export const sendMessage = async (chatId: number, text: string, keyboard?: any) => {
-  if (!BOT_TOKEN) {
-    console.error("TELEGRAM_BOT_TOKEN is not defined in environment variables");
-    return;
-  }
-
-  const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
-  
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: text,
-        reply_markup: keyboard,
-        parse_mode: 'Markdown',
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('Telegram API Error:', errorData);
-    }
-  } catch (error) {
-    console.error('Failed to send Telegram message:', error);
-  }
+  console.warn("sendMessage called on client-side. This function is disabled for security.");
 };
