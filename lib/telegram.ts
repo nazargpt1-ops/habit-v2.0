@@ -1,4 +1,5 @@
 
+
 // Define a safe interface for the Telegram WebApp object
 declare global {
   interface Window {
@@ -31,6 +32,8 @@ declare global {
         showConfirm: (message: string, callback?: (confirmed: boolean) => void) => void;
         showAlert: (message: string, callback?: () => void) => void;
         openTelegramLink: (url: string) => void;
+        setHeaderColor: (color: string) => void;
+        setBackgroundColor: (color: string) => void;
         MainButton: {
           text: string;
           color: string;

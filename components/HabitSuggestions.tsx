@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Mic, Dumbbell, BookOpen, Droplet, Moon, Ban, Plus, X } from 'lucide-react';
@@ -113,7 +112,7 @@ export const HabitSuggestions: React.FC<HabitSuggestionsProps> = ({ onAdd, onClo
   };
 
   return (
-    <div className="w-full relative bg-white/50 rounded-[32px] p-5 border border-white/60">
+    <div className="w-full relative bg-surface/50 dark:bg-slate-800/40 rounded-[32px] p-5 border border-white/60 dark:border-white/5">
       
       <div className="flex justify-between items-start mb-6 px-1">
           <motion.div 
@@ -121,13 +120,13 @@ export const HabitSuggestions: React.FC<HabitSuggestionsProps> = ({ onAdd, onClo
             animate={{ opacity: 1, x: 0 }}
             className="flex flex-col"
           >
-            <h3 className="text-lg font-bold text-gray-800 leading-tight">{t.quick_start_title}</h3>
-            <p className="text-xs text-gray-500 font-medium mt-1">{t.quick_start_desc}</p>
+            <h3 className="text-lg font-bold text-primary leading-tight">{t.quick_start_title}</h3>
+            <p className="text-xs text-secondary font-medium mt-1">{t.quick_start_desc}</p>
           </motion.div>
 
           <button 
             onClick={onClose}
-            className="p-2 -mr-2 -mt-2 text-gray-400 hover:text-gray-600 hover:bg-black/5 rounded-full transition-colors active:scale-95"
+            className="p-2 -mr-2 -mt-2 text-secondary hover:text-primary hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-colors active:scale-95"
             aria-label="Dismiss suggestions"
           >
             <X size={20} />
@@ -147,9 +146,9 @@ export const HabitSuggestions: React.FC<HabitSuggestionsProps> = ({ onAdd, onClo
             variants={itemVariants}
             whileTap={{ scale: 0.96 }}
             onClick={() => handlePresetClick(preset)}
-            className="relative flex flex-col items-center justify-center p-4 rounded-[24px] bg-white border border-transparent hover:border-black/5 transition-all duration-300 group shadow-sm"
+            className="relative flex flex-col items-center justify-center p-4 rounded-[24px] bg-white dark:bg-slate-800 border border-transparent dark:border-white/5 hover:border-black/5 dark:hover:border-white/20 transition-all duration-300 group shadow-sm"
           >
-            {/* Background tint via pseudo-element or absolute to keep bg white but tinted */}
+            {/* Background tint via pseudo-element to keep bg clean */}
             <div 
                 className="absolute inset-0 rounded-[24px] opacity-40 group-hover:opacity-60 transition-opacity" 
                 style={{ backgroundColor: hexToRgba(preset.color, 0.1) }} 
@@ -157,7 +156,7 @@ export const HabitSuggestions: React.FC<HabitSuggestionsProps> = ({ onAdd, onClo
 
             {/* Quick Add Icon Indicator */}
             <div 
-              className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center bg-white text-gray-900 shadow-sm opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100 z-10"
+              className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center bg-white dark:bg-slate-700 text-gray-900 dark:text-white shadow-sm opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100 z-10"
             >
               <Plus size={14} strokeWidth={3} />
             </div>
@@ -169,11 +168,11 @@ export const HabitSuggestions: React.FC<HabitSuggestionsProps> = ({ onAdd, onClo
               <preset.IconComponent size={20} strokeWidth={2.5} />
             </div>
 
-            <span className="relative z-10 font-bold text-gray-800 text-[13px] leading-tight text-center mb-0.5">
+            <span className="relative z-10 font-bold text-primary text-[13px] leading-tight text-center mb-0.5">
               {preset.title}
             </span>
             
-            <span className="relative z-10 text-[10px] font-bold uppercase tracking-wider opacity-50" style={{ color: preset.color }}>
+            <span className="relative z-10 text-[10px] font-bold uppercase tracking-wider opacity-60" style={{ color: preset.color }}>
               {getCategoryLabel(preset.category)}
             </span>
           </motion.button>

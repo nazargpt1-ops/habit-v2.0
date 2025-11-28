@@ -1,9 +1,8 @@
-
-
 import React, { useEffect, useState } from 'react';
 import { Dashboard } from './pages/Dashboard';
 import { Statistics } from './pages/Statistics';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { initTelegramApp } from './lib/telegram';
 import { Tab, Priority } from './types';
 import { LayoutGrid, BarChart3, Plus } from 'lucide-react';
@@ -12,7 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { AddHabitModal } from './components/AddHabitModal';
 import { createHabit } from './services/habitService';
 
-// Inner component to use Language Context
+// Inner component to use contexts
 const AppContent = () => {
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<Tab>(Tab.HABITS);
@@ -24,14 +23,13 @@ const AppContent = () => {
   }, []);
 
   const handleSaveHabit = async (title: string, priority: Priority, color: string, category: string, reminderTime?: string, reminderDate?: string, reminderDays?: string[]) => {
-    // createHabit handles user existence internally
     await createHabit(title, priority, color, category, reminderTime, reminderDate, reminderDays);
-    setLastUpdated(Date.now()); // Trigger refresh in Dashboard
+    setLastUpdated(Date.now()); 
     setIsModalOpen(false);
   };
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-[var(--tg-theme-bg-color)] text-[var(--tg-theme-text-color)] transition-colors duration-300 relative overflow-hidden">
+    <div className="h-screen w-screen flex flex-col bg-background text-primary transition-colors duration-300 relative overflow-hidden">
       
       {/* View Container */}
       <main className="flex-1 overflow-hidden relative">
@@ -55,7 +53,7 @@ const AppContent = () => {
 
       {/* Floating Glass Dock Navigation */}
       <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50">
-        <div className="px-8 py-3 bg-white/80 backdrop-blur-md rounded-[3rem] shadow-2xl border border-white/50 flex items-center gap-12">
+        <div className="px-8 py-3 bg-surface/80 dark:bg-slate-800/80 backdrop-blur-md rounded-[3rem] shadow-2xl border border-white/50 dark:border-white/10 flex items-center gap-12">
           
           {/* Habits Tab */}
           <button 
@@ -64,14 +62,14 @@ const AppContent = () => {
           >
             <div className={cn(
               "p-2 rounded-xl transition-all duration-300",
-              activeTab === Tab.HABITS ? "text-blue-600 scale-110" : "text-gray-400 hover:text-gray-600"
+              activeTab === Tab.HABITS ? "text-accent scale-110" : "text-secondary hover:text-primary"
             )}>
               <LayoutGrid size={26} strokeWidth={activeTab === Tab.HABITS ? 2.5 : 2} />
             </div>
             {activeTab === Tab.HABITS && (
               <motion.div 
                 layoutId="dot"
-                className="absolute -bottom-1 w-1 h-1 bg-blue-600 rounded-full" 
+                className="absolute -bottom-1 w-1 h-1 bg-accent rounded-full" 
               />
             )}
           </button>
@@ -81,7 +79,7 @@ const AppContent = () => {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => setIsModalOpen(true)}
-            className="w-14 h-14 rounded-full bg-black text-white flex items-center justify-center shadow-lg shadow-black/20 border-4 border-white/20 -mt-6 transform transition-transform"
+            className="w-14 h-14 rounded-full bg-primary dark:bg-accent text-background dark:text-slate-900 flex items-center justify-center shadow-lg shadow-black/20 dark:shadow-accent/20 border-4 border-white/20 dark:border-slate-800 -mt-6 transform transition-transform"
           >
             <Plus size={28} strokeWidth={3} />
           </motion.button>
@@ -93,14 +91,14 @@ const AppContent = () => {
           >
              <div className={cn(
               "p-2 rounded-xl transition-all duration-300",
-              activeTab === Tab.STATS ? "text-blue-600 scale-110" : "text-gray-400 hover:text-gray-600"
+              activeTab === Tab.STATS ? "text-accent scale-110" : "text-secondary hover:text-primary"
             )}>
               <BarChart3 size={26} strokeWidth={activeTab === Tab.STATS ? 2.5 : 2} />
             </div>
              {activeTab === Tab.STATS && (
               <motion.div 
                 layoutId="dot"
-                className="absolute -bottom-1 w-1 h-1 bg-blue-600 rounded-full" 
+                className="absolute -bottom-1 w-1 h-1 bg-accent rounded-full" 
               />
             )}
           </button>
@@ -121,9 +119,11 @@ const AppContent = () => {
 
 const App = () => {
   return (
-    <LanguageProvider>
-      <AppContent />
-    </LanguageProvider>
+    <ThemeProvider>
+      <LanguageProvider>
+        <AppContent />
+      </LanguageProvider>
+    </ThemeProvider>
   );
 };
 

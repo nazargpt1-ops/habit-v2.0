@@ -71,7 +71,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       
       // Determine language
       const lang = getLanguage(user?.language_code);
-      const t = TRANSLATIONS[lang];
+      const t = TRANSLATIONS[lang as keyof typeof TRANSLATIONS];
 
       // Inline Keyboard
       const reply_markup = {
@@ -105,7 +105,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // Determine language for callback too
       const lang = getLanguage(user?.language_code);
-      const t = TRANSLATIONS[lang];
+      const t = TRANSLATIONS[lang as keyof typeof TRANSLATIONS];
 
       if (data === 'help' && chatId) {
         await telegramFetch('sendMessage', {

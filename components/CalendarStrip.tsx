@@ -31,27 +31,27 @@ export const CalendarStrip: React.FC<CalendarStripProps> = ({ selectedDate, onSe
               className={cn(
                 "flex flex-col items-center justify-center min-w-[3.5rem] h-16 rounded-2xl mx-1 cursor-pointer transition-all duration-300 border",
                 isSelected 
-                  ? "bg-[var(--tg-theme-button-color)] border-[var(--tg-theme-button-color)] shadow-lg scale-105" 
-                  : "bg-[var(--tg-theme-bg-color)] border-gray-100 dark:border-gray-800"
+                  ? "bg-accent border-accent shadow-lg scale-105" 
+                  : "bg-white/50 dark:bg-slate-700/50 border-transparent dark:border-white/5"
               )}
             >
               <span className={cn(
                 "text-xs mb-1 font-medium",
-                isSelected ? "text-[var(--tg-theme-button-text-color)]" : "text-[var(--tg-theme-hint-color)]"
+                isSelected ? "text-white dark:text-slate-900" : "text-secondary"
               )}>
                 {dayLabels[date.getDay()]}
               </span>
               <span className={cn(
                 "text-lg font-bold",
-                isSelected ? "text-[var(--tg-theme-button-text-color)]" : "text-[var(--tg-theme-text-color)]",
-                isToday && !isSelected && "text-[var(--tg-theme-link-color)]"
+                isSelected ? "text-white dark:text-slate-900" : "text-primary",
+                isToday && !isSelected && "text-accent"
               )}>
                 {date.getDate()}
               </span>
               {isToday && (
                 <div className={cn(
                   "w-1 h-1 rounded-full mt-1",
-                  isSelected ? "bg-white" : "bg-[var(--tg-theme-link-color)]"
+                  isSelected ? "bg-white dark:bg-slate-900" : "bg-accent"
                 )} />
               )}
             </motion.div>

@@ -29,7 +29,7 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
           stroke="currentColor"
           strokeWidth={strokeWidth}
           fill="transparent"
-          className="text-gray-200"
+          className="text-gray-200 dark:text-slate-700/50"
         />
         {/* Indicator */}
         <motion.circle
@@ -50,7 +50,7 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
         <motion.span 
             initial={{ opacity: 0, scale: 0.5 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="text-4xl font-bold text-gray-800"
+            className="text-4xl font-bold text-primary"
         >
             {Math.round(percentage)}%
         </motion.span>
