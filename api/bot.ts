@@ -1,10 +1,8 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// Server-side route handler for Telegram Bot Webhook
-// Environment variables required: TELEGRAM_BOT_TOKEN, VITE_APP_URL
-
+// Environment variables
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const WEB_APP_URL = process.env.VITE_APP_URL;
-
 const TELEGRAM_API_BASE = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
 /**
@@ -36,9 +34,16 @@ async function telegramFetch(method: string, body: any) {
   }
 }
 
-export async function POST(req: Request) {
+// Main Vercel Serverless Function Handler
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // 1. Проверяем метод (Телеграм шлет только POST)
+  if (req.method !== 'POST') {
+    return res.status(200).send('Bot is running');
+  }
+
   try {
-    const update = await req.json();
+    // В Vercel Functions тело запроса уже распарсено в req.body
+    const update = req.body;
 
     // --- 1. Handle /start Command ---
     if (update.message && update.message.text === '/start') {
@@ -52,13 +57,14 @@ export async function POST(req: Request) {
       const reply_markup = {
         inline_keyboard: [
           [
+            // ВАЖНО: Используем правильную ссылку на сайт (не api/bot)
             { text: "🚀 Open HabitFlow", web_app: { url: WEB_APP_URL || 'https://habit-v2-0.vercel.app' } }
           ],
           [
             { text: "❓ How it works", callback_data: "help" }
           ],
           [
-            { text: "👨‍💻 Support / Feedback", url: "https://t.me/volskov" } // TODO: Replace YOUR_USERNAME
+            { text: "👨‍💻 Support / Feedback", url: "https://t.me/volskov" } 
           ]
         ]
       };
@@ -94,16 +100,11 @@ export async function POST(req: Request) {
       });
     }
 
-    return new Response(JSON.stringify({ status: 'ok' }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    // Vercel ждет ответ 200
+    return res.status(200).json({ status: 'ok' });
 
   } catch (error) {
     console.error('Error handling bot update:', error);
-    return new Response(JSON.stringify({ error: 'Internal Server Error' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return res.status(500).json({ error: 'Internal Server Error' });
   }
 }
