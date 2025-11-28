@@ -1,29 +1,50 @@
 
+export type Priority = 'high' | 'medium' | 'low';
+
+export type TaskStatus = 'pending' | 'completed' | 'failed';
 
 export interface User {
+  id?: string; // Supabase UUID
   telegram_id: number;
   username: string;
   first_name?: string;
   last_name?: string;
   language_code?: string;
+  avatar_url?: string;
+  total_coins?: number;
+  current_streak?: number;
+  created_at?: string;
 }
-
-export type Priority = 'high' | 'medium' | 'low';
 
 export interface Habit {
   id: string;
   user_id: number;
   title: string;
+  description?: string;
   category: string;
   color: string;
   icon?: string;
   priority: Priority;
+  
+  // Reminder / Scheduling
   reminder_time?: string; // "09:00"
   reminder_date?: string; // "2023-11-26"
   reminder_days?: string[]; // ["Mon", "Wed"]
+  due_time?: string;      // Alias/Extension for specific due times
+  
+  // Status & State
   is_archived: boolean;
+  is_completed?: boolean; // For static task lists
+  status?: TaskStatus;
+  
+  // Gamification
+  coins_reward?: number;
+  
   created_at?: string;
 }
+
+// Alias Task to Habit to satisfy new components using 'Task'
+export type Task = Habit;
 
 export interface Completion {
   id: string;
