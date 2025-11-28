@@ -52,7 +52,7 @@ export async function POST(req: Request) {
       const reply_markup = {
         inline_keyboard: [
           [
-            { text: "🚀 Open HabitFlow", web_app: { url: WEB_APP_URL || 'https://google.com' } }
+            { text: "🚀 Open HabitFlow", web_app: { url: WEB_APP_URL || 'https://habit-v2-0.vercel.app' } }
           ],
           [
             { text: "❓ How it works", callback_data: "help" }
