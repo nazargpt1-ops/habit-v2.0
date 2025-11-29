@@ -1,15 +1,12 @@
 name: Trigger Vercel Cron Deployment
 on:
   schedule:
-    - cron: '*/10 * * * *'  # Every 10 minutes
-  workflow_dispatch:  # Allow manual trigger
-
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
 jobs:
   trigger-vercel:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Vercel Deploy Hook
         run: |
-          curl -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}"
-        env:
-          VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+          curl -X POST ${{ secrets.VERCEL_DEPLOY_HOOK }}
