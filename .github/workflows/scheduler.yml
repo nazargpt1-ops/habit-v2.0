@@ -1,86 +1,15 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createClient } from '@supabase/supabase-js';
+name: Trigger Vercel Cron
+on:
+  schedule:
+    # Запускать каждые 10 минут
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Чтобы можно было запустить кнопку вручную для теста
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL!;
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // 1. Проверка авторизации
-  const authHeader = req.headers.authorization;
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  try {
-    const now = new Date();
-    
-    // 2. УМНОЕ ОКРУГЛЕНИЕ ВРЕМЕНИ
-    // GitHub запускает скрипт раз в 10 минут (00, 10, 20...).
-    // Даже если скрипт запустится в 14:03, мы округлим это до 14:00.
-    const roundedMinutes = Math.floor(now.getUTCMinutes() / 10) * 10;
-    
-    // Форматируем часы и минуты (UTC)
-    const hours = String(now.getUTCHours()).padStart(2, '0');
-    const minutes = String(roundedMinutes).padStart(2, '0');
-    const checkTimeUTC = `${hours}:${minutes}`;
-
-    // Форматируем для MSK (+3 часа)
-    const mskHourNum = (now.getUTCHours() + 3) % 24;
-    const mskHours = String(mskHourNum).padStart(2, '0');
-    const checkTimeMSK = `${mskHours}:${minutes}`;
-
-    console.log(`⏰ CRON EXECUTION (Round to 10 min)`);
-    console.log(`Searching for habits set at: ${checkTimeUTC} (UTC) OR ${checkTimeMSK} (MSK)`);
-
-    // 3. Поиск в базе
-    const { data: habits, error } = await supabase
-      .from('habits')
-      .select('*, users(telegram_id)')
-      .in('reminder_time', [checkTimeUTC, checkTimeMSK])
-      .eq('is_archived', false);
-
-    if (error) throw error;
-
-    console.log(`🔎 Found ${habits?.length || 0} habits.`);
-
-    // 4. Отправка
-    const results = [];
-    if (habits && habits.length > 0) {
-      for (const habit of habits) {
-        // @ts-ignore
-        const telegramId = habit.users?.telegram_id;
-        if (!telegramId) continue;
-
-        const text = `🔔 **Напоминание**\nПора: **${habit.title}**!`;
-        
-        // Отправляем без проверки ответа, чтобы не тормозить цикл
-        const send = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: telegramId,
-            text: text,
-            parse_mode: 'Markdown',
-            reply_markup: {
-              inline_keyboard: [[{ text: "✅ Готово", callback_data: `done_${habit.id}` }]]
-            }
-          })
-        });
-        results.push(send.status);
-      }
-    }
-
-    return res.status(200).json({ 
-      ok: true, 
-      checked: [checkTimeUTC, checkTimeMSK],
-      found: habits?.length,
-      sent: results.length
-    });
-
-  } catch (error: any) {
-    console.error('CRON ERROR:', error);
-    return res.status(500).json({ error: error.message });
-  }
-}
+jobs:
+  ping-api:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Vercel Cron Endpoint
+        run: |
+          curl -X GET ${{ secrets.VERCEL_APP_URL }}/api/cron \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
