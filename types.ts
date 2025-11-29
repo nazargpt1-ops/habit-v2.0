@@ -1,11 +1,11 @@
-
 export type Priority = 'high' | 'medium' | 'low';
 
 export type TaskStatus = 'pending' | 'completed' | 'failed';
 
 export interface User {
   id?: string; // Supabase UUID
-  telegram_id: number;
+  // Telegram ID может быть числом или строкой (JS безопаснее хранит большие ID как строки)
+  telegram_id: number | string; 
   username: string;
   first_name?: string;
   last_name?: string;
@@ -18,7 +18,8 @@ export interface User {
 
 export interface Habit {
   id: string;
-  user_id: number;
+  // Важно: user_id тоже должен уметь принимать строку
+  user_id: number | string; 
   title: string;
   description?: string;
   category: string;
@@ -34,7 +35,7 @@ export interface Habit {
   
   // Status & State
   is_archived: boolean;
-  is_completed?: boolean; // For static task lists
+  is_completed?: boolean; 
   status?: TaskStatus;
   
   // Gamification
@@ -43,7 +44,7 @@ export interface Habit {
   created_at?: string;
 }
 
-// Alias Task to Habit to satisfy new components using 'Task'
+// Alias Task to Habit (чтобы компоненты TaskCard не ломались)
 export type Task = Habit;
 
 export interface Completion {
@@ -54,11 +55,19 @@ export interface Completion {
   completed_at: string;
 }
 
+// Расширенный тип для UI (когда мы отображаем список)
 export interface HabitWithCompletion extends Habit {
   completed: boolean;
-  completionId?: string; // ID of the completion record if exists
+  completionId?: string; // ID записи о выполнении, если есть
   currentStreak?: number;
   todayNote?: string;
+}
+
+// Тип для ответов API (полезно для типизации fetch)
+export interface ApiResponse<T = any> {
+  data?: T;
+  error?: string;
+  status: number;
 }
 
 export enum Tab {
@@ -107,7 +116,8 @@ export interface Translations {
   everyday: string;
   swipeHint: string;
   theme: string;
-  // Legacy color keys (keeping for compatibility if needed, though strictly replacing usage)
+  
+  // Legacy color keys
   enableReminder: string;
   colorHealth: string;
   colorWork: string;
@@ -127,7 +137,7 @@ export interface Translations {
   last_7_days: string;
   habits_section_title: string;
   done_count: string;
-  create_habit_btn: string; // distinct from header
+  create_habit_btn: string; 
   edit_habit: string;
   habit_title_label: string;
   placeholder_title: string;
@@ -136,9 +146,9 @@ export interface Translations {
   priority_medium: string;
   priority_high: string;
   category_label: string;
-  enable_reminder: string; // lowercase alias
+  enable_reminder: string; 
   get_notified: string;
-  remind_at: string; // lowercase alias
+  remind_at: string; 
   save_habit: string;
   save_changes: string;
   delete_habit: string;
