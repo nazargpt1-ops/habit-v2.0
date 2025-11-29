@@ -8,35 +8,30 @@ const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const CRON_SECRET = process.env.CRON_SECRET || '';
 
 export default async (req: VercelRequest, res: VercelResponse) => {
-  // --- БЛОК ОТЛАДКИ (DEBUG) ---
+  // 1. Проверка авторизации (ЗАЩИТА ВКЛЮЧЕНА)
   const authHeader = req.headers.authorization;
-  console.log("🔍 DEBUG AUTH:");
-  console.log(`   -> Received Header: "${authHeader}"`);
-  console.log(`   -> Expected Secret: "${CRON_SECRET}"`); // (Увидим в логах, совпадает ли)
-  
-  // ВРЕМЕННО ОТКЛЮЧАЕМ ПРОВЕРКУ, ЧТОБЫ ПРОВЕРИТЬ РАБОТУ УВЕДОМЛЕНИЙ
-  // if (authHeader !== `Bearer ${CRON_SECRET}`) {
-  //   console.error("❌ Auth Failed (but proceeding for test)");
-  //   // return res.status(401).json({ error: 'Unauthorized' }); 
-  // }
-  // -----------------------------
+  if (authHeader !== `Bearer ${CRON_SECRET}`) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
 
   try {
     const now = new Date();
     
-    // Округление до 10 минут
+    // 2. Округление до 10 минут (так как GitHub запускает скрипт раз в 10 минут)
     const roundedMinutes = Math.floor(now.getUTCMinutes() / 10) * 10;
     
     const hours = String(now.getUTCHours()).padStart(2, '0');
     const minutes = String(roundedMinutes).padStart(2, '0');
     const checkTimeUTC = `${hours}:${minutes}`;
 
+    // 3. Расчет времени для MSK (UTC+3)
     const mskHourNum = (now.getUTCHours() + 3) % 24;
     const mskHours = String(mskHourNum).padStart(2, '0');
     const checkTimeMSK = `${mskHours}:${minutes}`;
 
     console.log(`⏰ CRON EXECUTION: Checking ${checkTimeUTC} (UTC) OR ${checkTimeMSK} (MSK)`);
 
+    // 4. Поиск привычек в базе
     const { data: habits, error } = await supabase
       .from('habits')
       .select('*, users(telegram_id)')
@@ -50,6 +45,7 @@ export default async (req: VercelRequest, res: VercelResponse) => {
 
     console.log(`🔎 Found ${habits?.length || 0} habits to notify`);
 
+    // 5. Рассылка уведомлений
     let sent = 0;
     if (habits && habits.length > 0) {
       for (const habit of habits) {
@@ -77,12 +73,12 @@ export default async (req: VercelRequest, res: VercelResponse) => {
             })
           });
           
-          const respData = await response.json();
-          if (respData.ok) {
+          if (response.ok) {
               console.log(`✅ Sent to ${telegramId}`);
               sent++;
           } else {
-              console.error(`❌ Telegram Error for ${telegramId}:`, respData);
+              const errText = await response.text();
+              console.error(`❌ Telegram Error for ${telegramId}:`, errText);
           }
         } catch (err) {
           console.error(`Failed to send to ${telegramId}:`, err);
@@ -92,7 +88,6 @@ export default async (req: VercelRequest, res: VercelResponse) => {
 
     return res.status(200).json({
       ok: true,
-      auth_debug: { received: authHeader, expected_set: !!CRON_SECRET }, // Покажет в браузере, есть ли секрет
       checked: [checkTimeUTC, checkTimeMSK],
       found: habits?.length || 0,
       sent
@@ -102,4 +97,5 @@ export default async (req: VercelRequest, res: VercelResponse) => {
     console.error('CRON FATAL ERROR:', error);
     return res.status(500).json({ error: error.message });
   }
+};
 };
