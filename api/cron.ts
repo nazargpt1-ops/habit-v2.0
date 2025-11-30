@@ -8,7 +8,7 @@ const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const CRON_SECRET = process.env.CRON_SECRET || '';
 
 export default async (req: VercelRequest, res: VercelResponse) => {
-  // 1. Проверка авторизации (ЗАЩИТА ВКЛЮЧЕНА)
+  // 1. Проверка авторизации
   const authHeader = req.headers.authorization;
   if (authHeader !== `Bearer ${CRON_SECRET}`) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -17,7 +17,7 @@ export default async (req: VercelRequest, res: VercelResponse) => {
   try {
     const now = new Date();
     
-    // 2. Округление до 10 минут (так как GitHub запускает скрипт раз в 10 минут)
+    // 2. Округление до 10 минут
     const roundedMinutes = Math.floor(now.getUTCMinutes() / 10) * 10;
     
     const hours = String(now.getUTCHours()).padStart(2, '0');
@@ -97,5 +97,4 @@ export default async (req: VercelRequest, res: VercelResponse) => {
     console.error('CRON FATAL ERROR:', error);
     return res.status(500).json({ error: error.message });
   }
-};
 };
