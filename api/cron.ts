@@ -5,13 +5,36 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
-const CRON_SECRET = process.env.CRON_SECRET || '';
+// Убираем пробелы, если они случайно попали в переменную
+const CRON_SECRET = (process.env.CRON_SECRET || '').trim();
 
 export default async (req: VercelRequest, res: VercelResponse) => {
-  // 1. Проверка авторизации
-  const authHeader = req.headers.authorization;
-  if (authHeader !== `Bearer ${CRON_SECRET}`) {
-    return res.status(401).json({ error: 'Unauthorized' });
+  // 1. Умная проверка авторизации
+  const authHeader = req.headers['authorization'] || '';
+  
+  // Вырезаем "Bearer " и пробелы, оставляем только сам пароль
+  const receivedToken = authHeader.replace('Bearer ', '').trim();
+
+  // ЛОГИРОВАНИЕ (Смотреть в Vercel Logs)
+  console.log(`🔐 AUTH DEBUG:`);
+  console.log(`   -> Received Token: "${receivedToken}"`);
+  console.log(`   -> Server Secret:  "${CRON_SECRET}"`);
+
+  // Если секрет на сервере пустой - значит переменная не загрузилась
+  if (!CRON_SECRET) {
+      console.error("❌ CRON_SECRET is missing in Vercel Environment Variables!");
+      return res.status(500).json({ error: 'Server misconfiguration: CRON_SECRET missing' });
+  }
+
+  // Сравниваем чистые строки
+  if (receivedToken !== CRON_SECRET) {
+    console.error("⛔ Access Denied: Tokens do not match.");
+    // Возвращаем детали ошибки, чтобы увидеть их в GitHub Actions
+    return res.status(401).json({ 
+        error: 'Unauthorized', 
+        received: receivedToken, 
+        expected_length: CRON_SECRET.length 
+    });
   }
 
   try {
