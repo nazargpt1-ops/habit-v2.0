@@ -1,12 +1,12 @@
-name: Trigger Cron Handler
+name: Trigger Vercel Cron
 on:
   schedule:
     - cron: '*/10 * * * *'
   workflow_dispatch:
+
 jobs:
-  trigger-cron:
+  ping-api:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Cron Handler
-        run: |
-          curl -X GET https://habit-v2-0.vercel.app/api/cron
+      - name: Call Vercel Cron Endpoint
+        run: curl "${{ secrets.VERCEL_APP_URL }}/api/cron" -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
