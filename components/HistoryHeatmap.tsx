@@ -65,7 +65,7 @@ export const HistoryHeatmap: React.FC<HistoryHeatmapProps> = ({ data }) => {
   };
 
   return (
-    <div className="w-full bg-white/60 backdrop-blur-xl rounded-[2.5rem] border border-white/50 shadow-xl p-6 relative overflow-hidden">
+    <div className="w-full bg-white/60 backdrop-blur-lg rounded-[2.5rem] border border-white/50 shadow-xl p-6 relative overflow-hidden">
         <div className="mb-4 flex items-center justify-between">
             <h3 className="text-lg font-bold text-gray-800 tracking-tight flex items-center gap-2">
                 {t.activity_history}
