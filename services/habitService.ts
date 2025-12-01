@@ -1,6 +1,5 @@
-
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
-import { Habit, Completion, HabitWithCompletion, Priority } from '../types';
+import { Habit, Completion, HabitWithCompletion, Priority, User } from '../types';
 import { formatDateKey } from '../lib/utils';
 
 const TEST_USER_ID = 99999999;
@@ -13,8 +12,8 @@ let hasVerifiedUser = false;
  * Gets the current user ID.
  * Prioritizes Telegram WebApp ID, falls back to static test ID for development.
  */
-export const getCurrentUserId = (): number => {
-  let userId = TEST_USER_ID;
+export const getCurrentUserId = (): number | string => {
+  let userId: number | string = TEST_USER_ID;
   
   if (typeof window !== 'undefined' && window.Telegram?.WebApp?.initDataUnsafe?.user?.id) {
     userId = window.Telegram.WebApp.initDataUnsafe.user.id;
@@ -109,6 +108,71 @@ export const ensureUserExists = async (): Promise<boolean> => {
   } catch (err) {
     console.error("[HabitService] Critical exception in ensureUserExists:", err);
     return false;
+  }
+};
+
+/**
+ * Fetches the current user's profile stats (coins, etc).
+ */
+export const fetchUserProfile = async (): Promise<User | null> => {
+  if (!isSupabaseConfigured || !supabase) return null;
+  const userId = getCurrentUserId();
+  
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('telegram_id', userId)
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    console.error("[HabitService] Error fetching user profile:", err);
+    return null;
+  }
+};
+
+/**
+ * Helper to safely update coins and XP for the current user.
+ * Handles Level up logic (100 XP per level).
+ */
+const updateUserGamification = async (coinAmount: number, xpAmount: number) => {
+  if (!isSupabaseConfigured || !supabase) return;
+  const userId = getCurrentUserId();
+
+  try {
+    // 1. Get current stats
+    const { data: user } = await supabase
+      .from('users')
+      .select('total_coins, xp, level')
+      .eq('telegram_id', userId)
+      .single();
+
+    if (!user) return;
+
+    // 2. Calculate new values
+    let newCoins = (user.total_coins || 0) + coinAmount;
+    if (newCoins < 0) newCoins = 0;
+
+    let newXP = (user.xp || 0) + xpAmount;
+    if (newXP < 0) newXP = 0;
+
+    // Level Logic: 100 XP = 1 Level. Level starts at 1.
+    const newLevel = Math.floor(newXP / 100) + 1;
+
+    // 3. Update DB
+    await supabase
+      .from('users')
+      .update({ 
+        total_coins: newCoins,
+        xp: newXP,
+        level: newLevel
+      })
+      .eq('telegram_id', userId);
+      
+  } catch (err) {
+    console.error("[HabitService] Failed to update gamification stats:", err);
   }
 };
 
@@ -212,7 +276,8 @@ export const createHabit = async (
         reminder_time: reminderTime,
         reminder_date: reminderDate,
         reminder_days: reminderDays,
-        is_archived: false
+        is_archived: false,
+        coins_reward: 10 // Default reward
       })
       .select()
       .single();
@@ -269,7 +334,7 @@ export const deleteHabit = async (habitId: string): Promise<boolean> => {
 };
 
 /**
- * Toggles completion status. 
+ * Toggles completion status and handles coin rewards.
  */
 export const toggleHabitCompletion = async (
   habitId: string, 
@@ -277,13 +342,23 @@ export const toggleHabitCompletion = async (
   isCompleted: boolean, 
   existingCompletionId?: string, 
   note?: string
-): Promise<{ success: boolean, newId?: string }> => {
+): Promise<{ success: boolean, newId?: string, coinsEarned?: number }> => {
   if (!isSupabaseConfigured || !supabase) return { success: false };
 
   // Note: We don't check ensureUserExists here for speed, assuming fetching habits worked.
   const dateKey = formatDateKey(date);
 
   try {
+    // 1. Fetch habit to know the reward amount
+    const { data: habit } = await supabase
+        .from('habits')
+        .select('coins_reward')
+        .eq('id', habitId)
+        .single();
+    
+    const reward = habit?.coins_reward || 10;
+    const xpReward = 10; // Fixed XP per habit for now
+
     if (isCompleted) {
       // Check existing to prevent duplicates
       const { data: existing } = await supabase
@@ -293,7 +368,7 @@ export const toggleHabitCompletion = async (
          .eq('date', dateKey)
          .maybeSingle();
 
-      if (existing) return { success: true, newId: existing.id };
+      if (existing) return { success: true, newId: existing.id, coinsEarned: 0 };
 
       const { data, error } = await supabase
         .from('completions')
@@ -307,8 +382,13 @@ export const toggleHabitCompletion = async (
         .single();
       
       if (error) throw error;
-      return { success: true, newId: data.id };
+
+      // Award Coins & XP
+      await updateUserGamification(reward, xpReward);
+
+      return { success: true, newId: data.id, coinsEarned: reward };
     } else {
+      // Undo completion
       if (!existingCompletionId) {
           // Fallback delete by composite key
           const { error: deleteError } = await supabase
@@ -318,16 +398,19 @@ export const toggleHabitCompletion = async (
             .eq('date', dateKey);
           
           if (deleteError) throw deleteError;
-          return { success: true };
+      } else {
+          const { error } = await supabase
+            .from('completions')
+            .delete()
+            .eq('id', existingCompletionId);
+          
+          if (error) throw error;
       }
-
-      const { error } = await supabase
-        .from('completions')
-        .delete()
-        .eq('id', existingCompletionId);
       
-      if (error) throw error;
-      return { success: true };
+      // Deduct Coins & XP
+      await updateUserGamification(-reward, -xpReward);
+
+      return { success: true, coinsEarned: -reward };
     }
   } catch (err) {
     console.error("[HabitService] Error toggling completion:", err);
