@@ -1,6 +1,7 @@
+
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar as CalendarIcon, Inbox, Sun, Moon } from 'lucide-react';
+import { Calendar as CalendarIcon, Inbox, Sun, Moon, Zap } from 'lucide-react';
 import { CalendarStrip } from '../components/CalendarStrip';
 import { HabitCard } from '../components/HabitCard';
 import { HabitDetailsModal } from '../components/HabitDetailsModal';
@@ -16,9 +17,10 @@ import {
   fetchWeeklyStats, 
   updateHabit, 
   createHabit, 
-  deleteHabit
+  deleteHabit,
+  fetchUserProfile
 } from '../services/habitService';
-import { HabitWithCompletion, Habit, Priority } from '../types';
+import { HabitWithCompletion, Habit, Priority, User } from '../types';
 import { hapticImpact, hapticSuccess } from '../lib/telegram';
 import confetti from 'canvas-confetti';
 import { cn } from '../lib/utils';
@@ -34,6 +36,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [habits, setHabits] = useState<HabitWithCompletion[]>([]);
   const [weeklyStats, setWeeklyStats] = useState<{day: string, count: number}[]>([]);
+  const [userProfile, setUserProfile] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   
@@ -50,10 +53,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
-    const data = await fetchHabitsWithCompletions(selectedDate);
-    const stats = await fetchWeeklyStats();
+    const [data, stats, profile] = await Promise.all([
+      fetchHabitsWithCompletions(selectedDate),
+      fetchWeeklyStats(),
+      fetchUserProfile()
+    ]);
+    
     setHabits(data);
     setWeeklyStats(stats);
+    setUserProfile(profile);
     setIsLoading(false);
   }, [selectedDate]);
 
@@ -89,12 +97,33 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
 
     const oldHabit = habits[habitIndex];
     const newStatus = !oldHabit.completed;
+    const reward = oldHabit.coins_reward || 10;
+    const xpReward = 10;
 
     if (newStatus) hapticSuccess();
 
+    // Optimistic UI Update
     const updatedHabits = [...habits];
     updatedHabits[habitIndex] = { ...oldHabit, completed: newStatus };
     setHabits(updatedHabits);
+    
+    // Optimistic Coin, XP, Level Update
+    if (userProfile) {
+        let newCoins = (userProfile.total_coins || 0) + (newStatus ? reward : -reward);
+        if (newCoins < 0) newCoins = 0;
+
+        let newXp = (userProfile.xp || 0) + (newStatus ? xpReward : -xpReward);
+        if (newXp < 0) newXp = 0;
+        
+        const newLevel = Math.floor(newXp / 100) + 1;
+
+        setUserProfile({ 
+            ...userProfile, 
+            total_coins: newCoins,
+            xp: newXp,
+            level: newLevel
+        });
+    }
 
     const totalHabits = updatedHabits.length;
     const completedCount = updatedHabits.filter(h => h.completed).length;
@@ -117,7 +146,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
         updatedHabits[habitIndex].completionId = result.newId;
         setHabits([...updatedHabits]);
     } else if (!result.success) {
-      setHabits(habits);
+        // Revert on failure
+        setHabits(habits);
+        if (userProfile) setUserProfile(userProfile); // simplified revert (not perfect but OK)
     }
   };
 
@@ -194,15 +225,76 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
            
            {/* Header Row: Date & Controls */}
            <div className="flex justify-between items-start mb-6">
-              <div>
-                 <p className="text-xs font-bold text-secondary uppercase tracking-wide mb-1">
-                   {isToday ? t.today : t.selected_date}
-                 </p>
-                 <h1 className="text-3xl font-extrabold text-primary tracking-tight leading-none capitalize">
-                   {dateString}
-                 </h1>
+              
+              {/* Left Column: Greeting, Level, Date */}
+              <div className="flex flex-col gap-3">
+                 
+                 {/* Profile Block (Simplified) */}
+                 {userProfile && (
+                   <div className="flex items-center gap-3">
+                       <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold text-sm shadow-md ring-2 ring-white/50 dark:ring-white/10">
+                           {userProfile.first_name?.[0]?.toUpperCase() || 'U'}
+                       </div>
+                       <div>
+                           <div className="flex items-center gap-2">
+                               <span className="font-bold text-sm text-primary leading-none truncate max-w-[100px]">
+                                   {userProfile.first_name || 'User'}
+                               </span>
+                           </div>
+                           <span className="text-xs text-secondary font-medium">
+                               Welcome back!
+                           </span>
+                       </div>
+                   </div>
+                 )}
+
+                 {/* Date Block */}
+                 <div>
+                    <p className="text-xs font-bold text-secondary uppercase tracking-wide mb-1 opacity-80">
+                      {isToday ? t.today : t.selected_date}
+                    </p>
+                    <h1 className="text-3xl font-extrabold text-primary tracking-tight leading-none capitalize">
+                      {dateString}
+                    </h1>
+                 </div>
               </div>
-              <div className="flex gap-2">
+
+              {/* Right Column: Controls */}
+              <div className="flex gap-2 items-center">
+                 
+                 {/* Gamification Stats (Level & XP) */}
+                 <div className="flex items-center gap-2 bg-surface/50 dark:bg-slate-800/50 p-1.5 pr-3 rounded-full border border-gray-100 dark:border-white/5 backdrop-blur-md shadow-sm mr-1">
+                    {/* Level Badge */}
+                    <div className="bg-indigo-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg shadow-indigo-500/30">
+                        Lvl {userProfile?.level || 1}
+                    </div>
+                    
+                    {/* Progress Bar Container */}
+                    <div className="hidden sm:flex flex-col gap-1 min-w-[60px]">
+                        <div className="h-1.5 w-full bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                            <motion.div 
+                                className="h-full bg-indigo-500 rounded-full"
+                                initial={{ width: 0 }}
+                                animate={{ width: `${(userProfile?.xp || 0) % 100}%` }}
+                                transition={{ duration: 1, ease: "easeOut" }}
+                            />
+                        </div>
+                    </div>
+                    
+                    {/* XP Text */}
+                    <span className="text-[10px] font-bold text-secondary whitespace-nowrap">
+                        {(userProfile?.xp || 0) % 100} <span className="opacity-60 text-[9px]">/ 100 XP</span>
+                    </span>
+                 </div>
+
+                 {/* Language Toggle */}
+                 <button 
+                   onClick={toggleLanguage}
+                   className="w-10 h-10 rounded-full bg-white/50 dark:bg-slate-700/50 hover:bg-white dark:hover:bg-slate-700 shadow-sm border border-white/60 dark:border-white/10 flex items-center justify-center text-secondary active:scale-95 transition-all"
+                 >
+                   <span className="text-xs font-bold">{language.toUpperCase()}</span>
+                 </button>
+
                  {/* Theme Toggle */}
                  <button 
                    onClick={toggleTheme}
@@ -219,14 +311,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
                         {theme === 'dark' ? <Moon size={18} className="fill-current" /> : <Sun size={18} className="fill-current" />}
                       </motion.div>
                    </AnimatePresence>
-                 </button>
-
-                 {/* Language Toggle */}
-                 <button 
-                   onClick={toggleLanguage}
-                   className="w-10 h-10 rounded-full bg-white/50 dark:bg-slate-700/50 hover:bg-white dark:hover:bg-slate-700 shadow-sm border border-white/60 dark:border-white/10 flex items-center justify-center text-secondary active:scale-95 transition-all"
-                 >
-                   <span className="text-xs font-bold uppercase">{language}</span>
                  </button>
 
                  {/* Calendar Toggle */}
