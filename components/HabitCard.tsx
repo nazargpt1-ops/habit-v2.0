@@ -1,6 +1,7 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, useMotionValue } from 'framer-motion';
-import { Check, Droplet, Book, Activity, Moon, Star, Zap, Flame, Bell } from 'lucide-react';
+import { Check, Droplet, Book, Activity, Moon, Star, Zap, Flame, Bell, Coins } from 'lucide-react';
 import { HabitWithCompletion, Habit } from '../types';
 import { cn, hexToRgba } from '../lib/utils';
 import confetti from 'canvas-confetti';
@@ -153,6 +154,12 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit, onToggle, onOpenDet
                 {getCategoryLabel(habit.category)}
               </span>
 
+              {/* XP Reward Badge (Replaced Coin) */}
+              <span className="flex items-center gap-1 text-[10px] text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-500/10 dark:bg-indigo-400/20 px-2 py-0.5 rounded-md border border-indigo-500/20">
+                 <Zap size={10} fill="currentColor" />
+                 <span>+10 XP</span>
+              </span>
+
               {/* Reminder Badge (Interactive) */}
               {habit.reminder_time && (
                  <motion.button 
@@ -206,3 +213,4 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit, onToggle, onOpenDet
     </motion.div>
   );
 };
+
