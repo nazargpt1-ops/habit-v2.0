@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar as CalendarIcon, Inbox, Sun, Moon, Zap } from 'lucide-react';
@@ -9,6 +8,7 @@ import { CircularProgress } from '../components/CircularProgress';
 import { WeeklyChart } from '../components/WeeklyChart';
 import { HabitSuggestions, PresetHabit } from '../components/HabitSuggestions';
 import { AddHabitModal } from '../components/AddHabitModal';
+import { LevelUpModal } from '../components/LevelUpModal';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { 
@@ -50,6 +50,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
 
   // Suggestions State
   const [isSuggestionsDismissed, setIsSuggestionsDismissed] = useState(false);
+
+  // Level Up Modal State
+  const [levelUpData, setLevelUpData] = useState<{ show: boolean, level: number }>({ show: false, level: 1 });
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -109,6 +112,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
     
     // Optimistic Coin, XP, Level Update
     if (userProfile) {
+        const oldLevel = userProfile.level || 1;
+
         let newCoins = (userProfile.total_coins || 0) + (newStatus ? reward : -reward);
         if (newCoins < 0) newCoins = 0;
 
@@ -123,11 +128,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
             xp: newXp,
             level: newLevel
         });
+
+        // Trigger Level Up Modal if level increased
+        if (newStatus && newLevel > oldLevel) {
+           setLevelUpData({ show: true, level: newLevel });
+        }
     }
 
     const totalHabits = updatedHabits.length;
     const completedCount = updatedHabits.filter(h => h.completed).length;
     
+    // Only trigger confetti if not leveling up (to avoid double celebration chaos, or maybe do both?)
+    // Let's allow habit completion confetti always, level up is extra
     if (newStatus && totalHabits > 0 && completedCount === totalHabits) {
         confetti({
             particleCount: 150,
@@ -462,6 +474,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
         onSave={handleSaveHabit}
         onDelete={() => editingHabit && handleDeleteHabit(editingHabit.id)}
         initialHabit={editingHabit}
+      />
+
+      <LevelUpModal
+        isOpen={levelUpData.show}
+        newLevel={levelUpData.level}
+        onClose={() => setLevelUpData(prev => ({ ...prev, show: false }))}
       />
     </div>
   );
