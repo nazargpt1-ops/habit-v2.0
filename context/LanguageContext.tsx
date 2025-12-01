@@ -119,6 +119,18 @@ const dictionaries: Record<Language, Translations> = {
     view_progress: "View Progress",
     new_badge: "New",
 
+    // Achievements
+    achievements_title: "Achievements",
+    badge_first_step_title: "First Step",
+    badge_first_step_desc: "Complete your first habit",
+    badge_week_streak_title: "On Fire",
+    badge_week_streak_desc: "Reach a 7-day streak",
+    badge_level_5_title: "Pro",
+    badge_level_5_desc: "Reach Level 5",
+    badge_early_bird_title: "Early Bird",
+    badge_early_bird_desc: "Complete a habit before 8 AM",
+    badge_locked: "Locked",
+
     // Quick Start Presets
     quick_start_title: "Quick Start",
     quick_start_desc: "Choose a template to begin",
@@ -244,6 +256,18 @@ const dictionaries: Record<Language, Translations> = {
     challenge_desc: "Выполни 50 привычек в этом месяце",
     view_progress: "Смотреть прогресс",
     new_badge: "Новое",
+
+    // Achievements
+    achievements_title: "Достижения",
+    badge_first_step_title: "Первый шаг",
+    badge_first_step_desc: "Выполни первую привычку",
+    badge_week_streak_title: "В ударе",
+    badge_week_streak_desc: "Стрик 7 дней подряд",
+    badge_level_5_title: "Профи",
+    badge_level_5_desc: "Достигни 5 уровня",
+    badge_early_bird_title: "Ранняя пташка",
+    badge_early_bird_desc: "Выполни привычку до 8 утра",
+    badge_locked: "Закрыто",
 
     // Quick Start Presets
     quick_start_title: "Быстрый старт",
