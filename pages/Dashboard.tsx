@@ -260,10 +260,52 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
               </div>
 
               {/* Right Column: Controls */}
-              <div className="flex gap-2 items-center">
+              <div className="flex flex-col items-end gap-3 z-10">
                  
+                 {/* Buttons Row */}
+                 <div className="flex gap-2 items-center">
+                    {/* Language Toggle */}
+                    <button 
+                      onClick={toggleLanguage}
+                      className="w-10 h-10 rounded-full bg-white/50 dark:bg-slate-700/50 hover:bg-white dark:hover:bg-slate-700 shadow-sm border border-white/60 dark:border-white/10 flex items-center justify-center text-secondary active:scale-95 transition-all"
+                    >
+                      <span className="text-xs font-bold">{language.toUpperCase()}</span>
+                    </button>
+
+                    {/* Theme Toggle */}
+                    <button 
+                      onClick={toggleTheme}
+                      className="w-10 h-10 rounded-full bg-white/50 dark:bg-slate-700/50 hover:bg-white dark:hover:bg-slate-700 shadow-sm border border-white/60 dark:border-white/10 flex items-center justify-center text-secondary active:scale-95 transition-all overflow-hidden"
+                    >
+                      <AnimatePresence mode="wait" initial={false}>
+                          <motion.div
+                            key={theme}
+                            initial={{ y: -20, opacity: 0, rotate: -90 }}
+                            animate={{ y: 0, opacity: 1, rotate: 0 }}
+                            exit={{ y: 20, opacity: 0, rotate: 90 }}
+                            transition={{ duration: 0.2 }}
+                          >
+                            {theme === 'dark' ? <Moon size={18} className="fill-current" /> : <Sun size={18} className="fill-current" />}
+                          </motion.div>
+                      </AnimatePresence>
+                    </button>
+
+                    {/* Calendar Toggle */}
+                    <button 
+                      onClick={() => setIsCalendarOpen(!isCalendarOpen)}
+                      className={cn(
+                        "w-10 h-10 rounded-full shadow-sm border flex items-center justify-center transition-all duration-300",
+                        isCalendarOpen 
+                          ? "bg-accent text-white border-accent shadow-blue-200 dark:shadow-none" 
+                          : "bg-white/50 dark:bg-slate-700/50 hover:bg-white dark:hover:bg-slate-700 text-secondary border-white/60 dark:border-white/10"
+                      )}
+                    >
+                      <CalendarIcon size={18} strokeWidth={2.5} />
+                    </button>
+                 </div>
+
                  {/* Gamification Stats (Level & XP) */}
-                 <div className="flex items-center gap-2 bg-surface/50 dark:bg-slate-800/50 p-1.5 pr-3 rounded-full border border-gray-100 dark:border-white/5 backdrop-blur-md shadow-sm mr-1">
+                 <div className="flex items-center gap-2 bg-surface/50 dark:bg-slate-800/50 p-1.5 pr-3 rounded-full border border-gray-100 dark:border-white/5 backdrop-blur-md shadow-sm">
                     {/* Level Badge */}
                     <div className="bg-indigo-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg shadow-indigo-500/30">
                         Lvl {userProfile?.level || 1}
@@ -287,44 +329,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
                     </span>
                  </div>
 
-                 {/* Language Toggle */}
-                 <button 
-                   onClick={toggleLanguage}
-                   className="w-10 h-10 rounded-full bg-white/50 dark:bg-slate-700/50 hover:bg-white dark:hover:bg-slate-700 shadow-sm border border-white/60 dark:border-white/10 flex items-center justify-center text-secondary active:scale-95 transition-all"
-                 >
-                   <span className="text-xs font-bold">{language.toUpperCase()}</span>
-                 </button>
-
-                 {/* Theme Toggle */}
-                 <button 
-                   onClick={toggleTheme}
-                   className="w-10 h-10 rounded-full bg-white/50 dark:bg-slate-700/50 hover:bg-white dark:hover:bg-slate-700 shadow-sm border border-white/60 dark:border-white/10 flex items-center justify-center text-secondary active:scale-95 transition-all overflow-hidden"
-                 >
-                   <AnimatePresence mode="wait" initial={false}>
-                      <motion.div
-                        key={theme}
-                        initial={{ y: -20, opacity: 0, rotate: -90 }}
-                        animate={{ y: 0, opacity: 1, rotate: 0 }}
-                        exit={{ y: 20, opacity: 0, rotate: 90 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        {theme === 'dark' ? <Moon size={18} className="fill-current" /> : <Sun size={18} className="fill-current" />}
-                      </motion.div>
-                   </AnimatePresence>
-                 </button>
-
-                 {/* Calendar Toggle */}
-                 <button 
-                   onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-                   className={cn(
-                     "w-10 h-10 rounded-full shadow-sm border flex items-center justify-center transition-all duration-300",
-                     isCalendarOpen 
-                       ? "bg-accent text-white border-accent shadow-blue-200 dark:shadow-none" 
-                       : "bg-white/50 dark:bg-slate-700/50 hover:bg-white dark:hover:bg-slate-700 text-secondary border-white/60 dark:border-white/10"
-                   )}
-                 >
-                   <CalendarIcon size={18} strokeWidth={2.5} />
-                 </button>
               </div>
            </div>
 
