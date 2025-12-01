@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { motion, useMotionValue } from 'framer-motion';
-import { Check, Droplet, Book, Activity, Moon, Star, Zap, Flame, Bell, Coins } from 'lucide-react';
+import { motion, useMotionValue, AnimatePresence } from 'framer-motion';
+import { Check, Droplet, Book, Activity, Moon, Star, Zap, Flame, Bell } from 'lucide-react';
 import { HabitWithCompletion, Habit } from '../types';
 import { cn, hexToRgba } from '../lib/utils';
 import confetti from 'canvas-confetti';
@@ -28,15 +28,22 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit, onToggle, onOpenDet
   const { t } = useLanguage();
   const x = useMotionValue(0);
   const [isEditingTime, setIsEditingTime] = useState(false);
+  const [showXp, setShowXp] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   
   const handleDragEnd = (event: any, info: any) => {
     if (info.offset.x > 80 && !habit.completed) {
        triggerConfetti(event);
+       handleCompletionEffect();
        onToggle(habit.id);
     } else if (info.offset.x < -80) {
       onOpenDetails(habit);
     }
+  };
+
+  const handleCompletionEffect = () => {
+    setShowXp(true);
+    setTimeout(() => setShowXp(false), 1500);
   };
 
   const triggerConfetti = (e: any) => {
@@ -190,25 +197,46 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit, onToggle, onOpenDet
           </div>
         </div>
 
-        {/* Custom Circular Checkbox */}
-        <button
-          onClick={(e) => {
-              e.stopPropagation();
-              if(!habit.completed) triggerConfetti(e);
-              onToggle(habit.id);
-          }}
-          className={cn(
-            "w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 shrink-0 ml-2 active:scale-90",
-            habit.completed 
-              ? "bg-green-500 shadow-[0_4px_12px_rgba(34,197,94,0.4)] scale-105" 
-              : "bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600"
-          )}
-        >
-          {habit.completed 
-            ? <Check size={24} className="text-white drop-shadow-sm" strokeWidth={3.5} />
-            : <div className="w-4 h-4 rounded-full border-2 border-gray-300 dark:border-slate-500" />
-          }
-        </button>
+        {/* Custom Circular Checkbox with Floating XP Particle */}
+        <div className="relative">
+          <AnimatePresence>
+            {showXp && (
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.5 }}
+                animate={{ opacity: 1, y: -40, scale: 1.2 }}
+                exit={{ opacity: 0, y: -50, scale: 0.8 }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
+                className="absolute left-1/2 -translate-x-1/2 top-0 pointer-events-none z-50 flex items-center gap-1 whitespace-nowrap"
+              >
+                 <span className="text-indigo-600 dark:text-indigo-400 font-extrabold text-sm drop-shadow-md flex items-center gap-0.5 bg-white/90 dark:bg-slate-800/90 px-2 py-0.5 rounded-full border border-indigo-500/30">
+                    <Zap size={12} fill="currentColor" /> +10 XP
+                 </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          
+          <button
+            onClick={(e) => {
+                e.stopPropagation();
+                if(!habit.completed) {
+                  triggerConfetti(e);
+                  handleCompletionEffect();
+                }
+                onToggle(habit.id);
+            }}
+            className={cn(
+              "w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 shrink-0 ml-2 active:scale-90 relative",
+              habit.completed 
+                ? "bg-green-500 shadow-[0_4px_12px_rgba(34,197,94,0.4)] scale-105" 
+                : "bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600"
+            )}
+          >
+            {habit.completed 
+              ? <Check size={24} className="text-white drop-shadow-sm" strokeWidth={3.5} />
+              : <div className="w-4 h-4 rounded-full border-2 border-gray-300 dark:border-slate-500" />
+            }
+          </button>
+        </div>
       </div>
     </motion.div>
   );
