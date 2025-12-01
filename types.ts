@@ -1,11 +1,11 @@
+
 export type Priority = 'high' | 'medium' | 'low';
 
 export type TaskStatus = 'pending' | 'completed' | 'failed';
 
 export interface User {
   id?: string; // Supabase UUID
-  // Telegram ID может быть числом или строкой (JS безопаснее хранит большие ID как строки)
-  telegram_id: number | string; 
+  telegram_id: number;
   username: string;
   first_name?: string;
   last_name?: string;
@@ -14,12 +14,14 @@ export interface User {
   total_coins?: number;
   current_streak?: number;
   created_at?: string;
+  // Gamification
+  xp?: number;
+  level?: number;
 }
 
 export interface Habit {
   id: string;
-  // Важно: user_id тоже должен уметь принимать строку
-  user_id: number | string; 
+  user_id: number;
   title: string;
   description?: string;
   category: string;
@@ -35,7 +37,7 @@ export interface Habit {
   
   // Status & State
   is_archived: boolean;
-  is_completed?: boolean; 
+  is_completed?: boolean; // For static task lists
   status?: TaskStatus;
   
   // Gamification
@@ -44,7 +46,7 @@ export interface Habit {
   created_at?: string;
 }
 
-// Alias Task to Habit (чтобы компоненты TaskCard не ломались)
+// Alias Task to Habit to satisfy new components using 'Task'
 export type Task = Habit;
 
 export interface Completion {
@@ -55,19 +57,11 @@ export interface Completion {
   completed_at: string;
 }
 
-// Расширенный тип для UI (когда мы отображаем список)
 export interface HabitWithCompletion extends Habit {
   completed: boolean;
-  completionId?: string; // ID записи о выполнении, если есть
+  completionId?: string; // ID of the completion record if exists
   currentStreak?: number;
   todayNote?: string;
-}
-
-// Тип для ответов API (полезно для типизации fetch)
-export interface ApiResponse<T = any> {
-  data?: T;
-  error?: string;
-  status: number;
 }
 
 export enum Tab {
@@ -116,8 +110,7 @@ export interface Translations {
   everyday: string;
   swipeHint: string;
   theme: string;
-  
-  // Legacy color keys
+  // Legacy color keys (keeping for compatibility if needed, though strictly replacing usage)
   enableReminder: string;
   colorHealth: string;
   colorWork: string;
@@ -137,7 +130,7 @@ export interface Translations {
   last_7_days: string;
   habits_section_title: string;
   done_count: string;
-  create_habit_btn: string; 
+  create_habit_btn: string; // distinct from header
   edit_habit: string;
   habit_title_label: string;
   placeholder_title: string;
@@ -146,9 +139,9 @@ export interface Translations {
   priority_medium: string;
   priority_high: string;
   category_label: string;
-  enable_reminder: string; 
+  enable_reminder: string; // lowercase alias
   get_notified: string;
-  remind_at: string; 
+  remind_at: string; // lowercase alias
   save_habit: string;
   save_changes: string;
   delete_habit: string;
@@ -196,6 +189,18 @@ export interface Translations {
   view_progress: string;
   new_badge: string;
 
+  // Achievements
+  achievements_title: string;
+  badge_first_step_title: string;
+  badge_first_step_desc: string;
+  badge_week_streak_title: string;
+  badge_week_streak_desc: string;
+  badge_level_5_title: string;
+  badge_level_5_desc: string;
+  badge_early_bird_title: string;
+  badge_early_bird_desc: string;
+  badge_locked: string;
+
   // Quick Start Presets
   quick_start_title: string;
   quick_start_desc: string;
@@ -206,3 +211,4 @@ export interface Translations {
   preset_meditation: string;
   preset_no_sugar: string;
 }
+
