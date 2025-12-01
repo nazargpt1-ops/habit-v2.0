@@ -1,7 +1,10 @@
+
 import React, { useEffect, useState } from 'react';
 import { HistoryHeatmap } from '../components/HistoryHeatmap';
+import { AchievementsGrid } from '../components/AchievementsGrid';
 import { useLanguage } from '../context/LanguageContext';
-import { fetchHeatmapData, HeatmapData } from '../services/habitService';
+import { fetchHeatmapData, fetchUserProfile, HeatmapData } from '../services/habitService';
+import { User } from '../types';
 import { Trophy, Flame, CheckCircle2, TrendingUp, Share2 } from 'lucide-react';
 
 export const Statistics: React.FC = () => {
@@ -9,16 +12,22 @@ export const Statistics: React.FC = () => {
   const [heatmapData, setHeatmapData] = useState<HeatmapData[]>([]);
   const [totalCompletions, setTotalCompletions] = useState(0);
   const [currentStreak, setCurrentStreak] = useState(0);
+  const [userProfile, setUserProfile] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadStats = async () => {
       setIsLoading(true);
       // Service determines user context internally
-      const { heatmap, totalCompletions, currentStreak } = await fetchHeatmapData();
-      setHeatmapData(heatmap);
-      setTotalCompletions(totalCompletions);
-      setCurrentStreak(currentStreak);
+      const [stats, profile] = await Promise.all([
+        fetchHeatmapData(),
+        fetchUserProfile()
+      ]);
+      
+      setHeatmapData(stats.heatmap);
+      setTotalCompletions(stats.totalCompletions);
+      setCurrentStreak(stats.currentStreak);
+      setUserProfile(profile);
       setIsLoading(false);
     };
     loadStats();
@@ -54,7 +63,7 @@ export const Statistics: React.FC = () => {
         <div className="absolute bottom-[-10%] left-[-10%] w-[400px] h-[400px] bg-blue-300/20 dark:bg-blue-900/10 rounded-full blur-[80px]" />
       </div>
 
-      <div className="relative z-10 space-y-6">
+      <div className="relative z-10 space-y-8">
         
         <header>
             <h1 className="text-3xl font-extrabold text-primary tracking-tight">{t.profile_stats}</h1>
@@ -116,6 +125,11 @@ export const Statistics: React.FC = () => {
             <div className="h-48 bg-surface/50 dark:bg-slate-800/50 animate-pulse rounded-[2.5rem]" />
         ) : (
             <HistoryHeatmap data={heatmapData} />
+        )}
+
+        {/* Achievements Section */}
+        {!isLoading && (
+          <AchievementsGrid user={userProfile} totalCompleted={totalCompletions} />
         )}
 
         {/* Challenges Teaser */}
