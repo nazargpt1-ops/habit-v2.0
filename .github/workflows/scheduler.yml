@@ -8,7 +8,7 @@ jobs:
   ping-api:
     runs-on: ubuntu-latest
     steps:
-      - name: Call Vercel Cron Endpoint
+     - name: Call Vercel Cron Endpoint
         run: |
-          curl "${{ secrets.VERCEL_APP_URL }}/api/cron" \
+          curl -L "${{ secrets.VERCEL_APP_URL }}/api/cron" \
           -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
