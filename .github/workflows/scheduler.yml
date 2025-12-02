@@ -1,4 +1,5 @@
 name: Trigger Vercel Cron
+
 on:
   schedule:
     - cron: '*/10 * * * *'
