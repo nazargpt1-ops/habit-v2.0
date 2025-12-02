@@ -5,82 +5,85 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
-// Убираем пробелы, если они случайно попали в переменную
-const CRON_SECRET = (process.env.CRON_SECRET || '').trim();
+const CRON_SECRET = process.env.CRON_SECRET || '';
+
+// Функция для получения массива времени (интервал 10 минут)
+function getTenMinuteWindow(date: Date, offsetHours: number = 0): string[] {
+  const times: string[] = [];
+  
+  // Копируем дату, чтобы не менять оригинал
+  const baseTime = new Date(date);
+  
+  // Добавляем смещение (для MSK)
+  baseTime.setUTCHours(baseTime.getUTCHours() + offsetHours);
+  
+  // Округляем вниз до ближайших 10 минут (18:14 -> 18:10)
+  const currentMinutes = baseTime.getUTCMinutes();
+  const roundedMinutes = Math.floor(currentMinutes / 10) * 10;
+  baseTime.setUTCMinutes(roundedMinutes);
+  
+  // Генерируем 10-12 минут вперед (с запасом), чтобы покрыть весь интервал
+  for (let i = 0; i < 12; i++) {
+    const futureTime = new Date(baseTime);
+    futureTime.setUTCMinutes(baseTime.getUTCMinutes() + i);
+    
+    const h = String(futureTime.getUTCHours()).padStart(2, '0');
+    const m = String(futureTime.getUTCMinutes()).padStart(2, '0');
+    times.push(`${h}:${m}`);
+  }
+  
+  return times;
+}
 
 export default async (req: VercelRequest, res: VercelResponse) => {
-  // 1. Умная проверка авторизации
+  // 1. Защита
   const authHeader = req.headers['authorization'] || '';
-  
-  // Вырезаем "Bearer " и пробелы, оставляем только сам пароль
   const receivedToken = authHeader.replace('Bearer ', '').trim();
 
-  // ЛОГИРОВАНИЕ (Смотреть в Vercel Logs)
-  console.log(`🔐 AUTH DEBUG:`);
-  console.log(`   -> Received Token: "${receivedToken}"`);
-  console.log(`   -> Server Secret:  "${CRON_SECRET}"`);
-
-  // Если секрет на сервере пустой - значит переменная не загрузилась
-  if (!CRON_SECRET) {
-      console.error("❌ CRON_SECRET is missing in Vercel Environment Variables!");
-      return res.status(500).json({ error: 'Server misconfiguration: CRON_SECRET missing' });
-  }
-
-  // Сравниваем чистые строки
   if (receivedToken !== CRON_SECRET) {
-    console.error("⛔ Access Denied: Tokens do not match.");
-    // Возвращаем детали ошибки, чтобы увидеть их в GitHub Actions
-    return res.status(401).json({ 
-        error: 'Unauthorized', 
-        received: receivedToken, 
-        expected_length: CRON_SECRET.length 
-    });
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   try {
     const now = new Date();
+
+    // 2. Генерируем "окно" времени
+    // Получаем массив минут для UTC (0) и MSK (+3)
+    // Например: ["14:10", "14:11", ... "14:19"] и ["17:10", "17:11", ... "17:19"]
+    const timesUTC = getTenMinuteWindow(now, 0);
+    const timesMSK = getTenMinuteWindow(now, 3);
     
-    // 2. Округление до 10 минут
-    const roundedMinutes = Math.floor(now.getUTCMinutes() / 10) * 10;
-    
-    const hours = String(now.getUTCHours()).padStart(2, '0');
-    const minutes = String(roundedMinutes).padStart(2, '0');
-    const checkTimeUTC = `${hours}:${minutes}`;
+    // Объединяем оба массива
+    const allTimesToCheck = [...new Set([...timesUTC, ...timesMSK])];
 
-    // 3. Расчет времени для MSK (UTC+3)
-    const mskHourNum = (now.getUTCHours() + 3) % 24;
-    const mskHours = String(mskHourNum).padStart(2, '0');
-    const checkTimeMSK = `${mskHours}:${minutes}`;
+    console.log(`⏰ CRON WINDOW: Checking habits set for:`, allTimesToCheck);
 
-    console.log(`⏰ CRON EXECUTION: Checking ${checkTimeUTC} (UTC) OR ${checkTimeMSK} (MSK)`);
-
-    // 4. Поиск привычек в базе
+    // 3. Ищем в базе ЛЮБОЕ совпадение из списка
+    // Используем фильтр .in(), так как у нас теперь точный список минут
     const { data: habits, error } = await supabase
       .from('habits')
       .select('*, users(telegram_id)')
-      .in('reminder_time', [checkTimeUTC, checkTimeMSK])
-      .eq('is_archived', false);
+      .eq('is_archived', false)
+      .in('reminder_time', allTimesToCheck); 
 
     if (error) {
       console.error("DB Error:", error);
       throw error;
     }
 
-    console.log(`🔎 Found ${habits?.length || 0} habits to notify`);
+    console.log(`🔎 Found ${habits?.length || 0} habits.`);
 
-    // 5. Рассылка уведомлений
+    // 4. Рассылка
     let sent = 0;
     if (habits && habits.length > 0) {
       for (const habit of habits) {
         // @ts-ignore
         const telegramId = habit.users?.telegram_id;
         
-        if (!telegramId) {
-            console.log(`Skipping habit "${habit.title}" - No Telegram ID`);
-            continue;
-        }
+        if (!telegramId) continue;
 
-        const text = `🔔 **Напоминание**\nПора: **${habit.title}**!`;
+        // Добавим точное время в сообщение
+        const text = `🔔 **Напоминание (${habit.reminder_time})**\nПора: **${habit.title}**!`;
         
         try {
           const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
@@ -96,13 +99,7 @@ export default async (req: VercelRequest, res: VercelResponse) => {
             })
           });
           
-          if (response.ok) {
-              console.log(`✅ Sent to ${telegramId}`);
-              sent++;
-          } else {
-              const errText = await response.text();
-              console.error(`❌ Telegram Error for ${telegramId}:`, errText);
-          }
+          if (response.ok) sent++;
         } catch (err) {
           console.error(`Failed to send to ${telegramId}:`, err);
         }
@@ -111,13 +108,13 @@ export default async (req: VercelRequest, res: VercelResponse) => {
 
     return res.status(200).json({
       ok: true,
-      checked: [checkTimeUTC, checkTimeMSK],
+      window_checked: allTimesToCheck,
       found: habits?.length || 0,
       sent
     });
 
   } catch (error: any) {
-    console.error('CRON FATAL ERROR:', error);
+    console.error('CRON ERROR:', error);
     return res.status(500).json({ error: error.message });
   }
 };
