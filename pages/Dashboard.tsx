@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar as CalendarIcon, Inbox, Sun, Moon, Zap } from 'lucide-react';
@@ -8,7 +9,7 @@ import { CircularProgress } from '../components/CircularProgress';
 import { WeeklyChart } from '../components/WeeklyChart';
 import { HabitSuggestions, PresetHabit } from '../components/HabitSuggestions';
 import { AddHabitModal } from '../components/AddHabitModal';
-import { LevelUpModal } from '../components/LevelUpModal';
+import { BadgeUnlockModal } from '../components/BadgeUnlockModal';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { 
@@ -51,8 +52,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
   // Suggestions State
   const [isSuggestionsDismissed, setIsSuggestionsDismissed] = useState(false);
 
-  // Level Up Modal State
-  const [levelUpData, setLevelUpData] = useState<{ show: boolean, level: number }>({ show: false, level: 1 });
+  // Badge Modal State
+  const [unlockedBadge, setUnlockedBadge] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -112,8 +113,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
     
     // Optimistic Coin, XP, Level Update
     if (userProfile) {
-        const oldLevel = userProfile.level || 1;
-
         let newCoins = (userProfile.total_coins || 0) + (newStatus ? reward : -reward);
         if (newCoins < 0) newCoins = 0;
 
@@ -128,18 +127,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
             xp: newXp,
             level: newLevel
         });
-
-        // Trigger Level Up Modal if level increased
-        if (newStatus && newLevel > oldLevel) {
-           setLevelUpData({ show: true, level: newLevel });
-        }
     }
 
     const totalHabits = updatedHabits.length;
     const completedCount = updatedHabits.filter(h => h.completed).length;
     
-    // Only trigger confetti if not leveling up (to avoid double celebration chaos, or maybe do both?)
-    // Let's allow habit completion confetti always, level up is extra
+    // Mini celebration for completing all habits
     if (newStatus && totalHabits > 0 && completedCount === totalHabits) {
         confetti({
             particleCount: 150,
@@ -152,15 +145,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
         });
     }
 
+    // Call Service
     const result = await toggleHabitCompletion(habitId, selectedDate, newStatus, oldHabit.completionId);
     
     if (result.success && newStatus && result.newId) {
         updatedHabits[habitIndex].completionId = result.newId;
         setHabits([...updatedHabits]);
+        
+        // --- Badge Check ---
+        if (result.newBadge) {
+           setUnlockedBadge(result.newBadge);
+        }
+
     } else if (!result.success) {
         // Revert on failure
         setHabits(habits);
-        if (userProfile) setUserProfile(userProfile); // simplified revert (not perfect but OK)
+        if (userProfile) setUserProfile(userProfile);
     }
   };
 
@@ -223,7 +223,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
   return (
     <div className="flex flex-col h-full w-full bg-background text-primary font-sans relative overflow-hidden">
       
-      {/* Background Orbs (Juicy & Animated) */}
+      {/* Background Orbs */}
       <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-400/20 dark:bg-blue-600/10 rounded-full blur-[100px] animate-pulse" style={{ animationDuration: '8s' }} />
         <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-purple-400/20 dark:bg-cyan-600/10 rounded-full blur-[100px] animate-pulse" style={{ animationDuration: '12s' }} />
@@ -241,7 +241,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
               {/* Left Column: Greeting, Level, Date */}
               <div className="flex flex-col gap-3">
                  
-                 {/* Profile Block (Simplified) */}
+                 {/* Profile Block */}
                  {userProfile && (
                    <div className="flex items-center gap-3">
                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold text-sm shadow-md ring-2 ring-white/50 dark:ring-white/10">
@@ -476,10 +476,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
         initialHabit={editingHabit}
       />
 
-      <LevelUpModal
-        isOpen={levelUpData.show}
-        newLevel={levelUpData.level}
-        onClose={() => setLevelUpData(prev => ({ ...prev, show: false }))}
+      <BadgeUnlockModal 
+        badgeId={unlockedBadge} 
+        onClose={() => setUnlockedBadge(null)} 
       />
     </div>
   );
