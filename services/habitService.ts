@@ -439,3 +439,91 @@ export const fetchHeatmapData = async (): Promise<{ heatmap: HeatmapData[], tota
       return { heatmap: [], totalCompletions: 0, currentStreak: 0 };
   }
 };
+
+export interface RPGStat {
+  subject: string;
+  A: number;
+  fullMark: number;
+}
+
+export const fetchRPGStats = async (): Promise<RPGStat[]> => {
+  // Return Mock data if Supabase is not configured to let user see UI
+  if (!isSupabaseConfigured || !supabase) {
+    return [
+      { subject: 'VIT', A: 45, fullMark: 100 },
+      { subject: 'INT', A: 70, fullMark: 100 },
+      { subject: 'DIS', A: 30, fullMark: 100 },
+      { subject: 'CHA', A: 60, fullMark: 100 },
+      { subject: 'WIS', A: 25, fullMark: 100 },
+      { subject: 'STA', A: 80, fullMark: 100 },
+    ];
+  }
+
+  const userId = getCurrentUserId();
+
+  // Mapping from our categories to RPG Stats
+  const categoryMap: Record<string, string> = {
+    'Health': 'VIT',     // Vitality
+    'Mind': 'INT',       // Intellect
+    'Mindfulness': 'INT',
+    'Work': 'DIS',       // Discipline
+    'Social': 'CHA',     // Charisma
+    'Growth': 'WIS',     // Wisdom
+    'Energy': 'STA',     // Stamina
+  };
+
+  const scores: Record<string, number> = {
+    'VIT': 0, 'INT': 0, 'DIS': 0, 'CHA': 0, 'WIS': 0, 'STA': 0
+  };
+
+  try {
+    // 1. Fetch completions and join with habit details to get category
+    const { data: completions, error } = await supabase
+      .from('completions')
+      .select('habit_id, habits (category)')
+      .eq('user_id', userId);
+
+    if (error) throw error;
+
+    // 2. Aggregate scores
+    if (completions) {
+      completions.forEach((item: any) => {
+        const habitData = Array.isArray(item.habits) ? item.habits[0] : item.habits;
+        const cat = habitData?.category || '';
+        
+        let stat = categoryMap[cat];
+        
+        // Fallback for case-insensitive or slight variations
+        if (!stat) {
+           if (cat.toLowerCase().includes('health')) stat = 'VIT';
+           else if (cat.toLowerCase().includes('mind')) stat = 'INT';
+           else if (cat.toLowerCase().includes('work')) stat = 'DIS';
+           else if (cat.toLowerCase().includes('social')) stat = 'CHA';
+           else if (cat.toLowerCase().includes('growth')) stat = 'WIS';
+           else if (cat.toLowerCase().includes('energy')) stat = 'STA';
+        }
+
+        if (stat && scores[stat] !== undefined) {
+          scores[stat] += 1; // Increment by 1 per completion. Logic can be adjusted for difficulty.
+        }
+      });
+    }
+
+    // 3. Format for Recharts
+    const order = ['VIT', 'INT', 'DIS', 'CHA', 'WIS', 'STA'];
+    
+    // Determine dynamic fullMark (max value + buffer)
+    const maxVal = Math.max(...Object.values(scores), 1); 
+    const fullMark = Math.ceil(maxVal * 1.2); 
+
+    return order.map(subject => ({
+      subject,
+      A: scores[subject],
+      fullMark: fullMark < 10 ? 10 : fullMark // Minimum scale of 10
+    }));
+
+  } catch (err) {
+    console.error("Error fetching RPG stats:", err);
+    return ['VIT', 'INT', 'DIS', 'CHA', 'WIS', 'STA'].map(s => ({ subject: s, A: 0, fullMark: 10 }));
+  }
+};
