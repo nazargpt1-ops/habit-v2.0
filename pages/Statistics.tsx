@@ -2,14 +2,16 @@
 import React, { useEffect, useState } from 'react';
 import { HistoryHeatmap } from '../components/HistoryHeatmap';
 import { AchievementsGrid } from '../components/AchievementsGrid';
+import { RPGChart } from '../components/RPGChart';
 import { useLanguage } from '../context/LanguageContext';
-import { fetchHeatmapData, fetchUserProfile, HeatmapData } from '../services/habitService';
+import { fetchHeatmapData, fetchUserProfile, fetchRPGStats, HeatmapData, RPGStat } from '../services/habitService';
 import { User } from '../types';
 import { Trophy, Flame, CheckCircle2, TrendingUp, Share2 } from 'lucide-react';
 
 export const Statistics: React.FC = () => {
   const { t } = useLanguage();
   const [heatmapData, setHeatmapData] = useState<HeatmapData[]>([]);
+  const [rpgData, setRpgData] = useState<RPGStat[]>([]);
   const [totalCompletions, setTotalCompletions] = useState(0);
   const [currentStreak, setCurrentStreak] = useState(0);
   const [userProfile, setUserProfile] = useState<User | null>(null);
@@ -18,17 +20,24 @@ export const Statistics: React.FC = () => {
   useEffect(() => {
     const loadStats = async () => {
       setIsLoading(true);
-      // Service determines user context internally
-      const [stats, profile] = await Promise.all([
-        fetchHeatmapData(),
-        fetchUserProfile()
-      ]);
-      
-      setHeatmapData(stats.heatmap);
-      setTotalCompletions(stats.totalCompletions);
-      setCurrentStreak(stats.currentStreak);
-      setUserProfile(profile);
-      setIsLoading(false);
+      try {
+        // Service determines user context internally
+        const [stats, rpg, profile] = await Promise.all([
+          fetchHeatmapData(),
+          fetchRPGStats(),
+          fetchUserProfile()
+        ]);
+        
+        setHeatmapData(stats.heatmap);
+        setTotalCompletions(stats.totalCompletions);
+        setCurrentStreak(stats.currentStreak);
+        setRpgData(rpg);
+        setUserProfile(profile);
+      } catch (e) {
+        console.error("Failed to load statistics:", e);
+      } finally {
+        setIsLoading(false);
+      }
     };
     loadStats();
   }, []);
@@ -120,16 +129,25 @@ export const Statistics: React.FC = () => {
             </div>
         </div>
 
+        {/* Achievements Section */}
+        {!isLoading && (
+          <AchievementsGrid user={userProfile} totalCompleted={totalCompletions} />
+        )}
+
+        {/* RPG Radar Chart */}
+        {isLoading ? (
+             <div className="w-full h-[300px] bg-surface/50 dark:bg-slate-800/50 animate-pulse rounded-[2.5rem] flex items-center justify-center">
+                <span className="text-sm font-medium text-secondary">Loading Skill Tree...</span>
+             </div>
+        ) : (
+            <RPGChart data={rpgData} />
+        )}
+
         {/* Heatmap Section */}
         {isLoading ? (
             <div className="h-48 bg-surface/50 dark:bg-slate-800/50 animate-pulse rounded-[2.5rem]" />
         ) : (
             <HistoryHeatmap data={heatmapData} />
-        )}
-
-        {/* Achievements Section */}
-        {!isLoading && (
-          <AchievementsGrid user={userProfile} totalCompleted={totalCompletions} />
         )}
 
         {/* Challenges Teaser */}
