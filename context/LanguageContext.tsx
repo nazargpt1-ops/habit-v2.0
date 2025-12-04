@@ -140,6 +140,9 @@ const dictionaries: Record<Language, Translations> = {
     badge_early_bird_desc: "Complete a habit before 8 AM",
     badge_locked: "Locked",
 
+    // Sharing
+    share_message: "I'm building better habits with HabitFlow! 🚀\n\n🔥 Current Streak: {streak} days\n🏆 Total Habits: {total}\n\nJoin me and level up your life! 👇",
+
     // Quick Start Presets
     quick_start_title: "Quick Start",
     quick_start_desc: "Choose a template to begin",
@@ -286,6 +289,9 @@ const dictionaries: Record<Language, Translations> = {
     badge_early_bird_title: "Ранняя пташка",
     badge_early_bird_desc: "Выполни привычку до 8 утра",
     badge_locked: "Закрыто",
+
+    // Sharing
+    share_message: "Я прокачиваю привычки в HabitFlow! 🚀\n\n🔥 Текущая серия: {streak} дн.\n🏆 Выполнено: {total}\n\nПрисоединяйся, попробуем не слиться вместе! 👇",
 
     // Quick Start Presets
     quick_start_title: "Быстрый старт",
