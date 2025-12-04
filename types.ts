@@ -182,12 +182,21 @@ export interface Translations {
   last_365: string;
   less: string;
   more: string;
+  skill_tree: string; // New
   challenges_title: string;
   global_challenge: string;
   consistency_master: string;
   challenge_desc: string;
   view_progress: string;
   new_badge: string;
+  
+  // RPG Stats Keys
+  rpg_vit: string;
+  rpg_int: string;
+  rpg_dis: string;
+  rpg_cha: string;
+  rpg_wis: string;
+  rpg_sta: string;
 
   // Achievements
   achievements_title: string;
@@ -211,4 +220,3 @@ export interface Translations {
   preset_meditation: string;
   preset_no_sugar: string;
 }
-
