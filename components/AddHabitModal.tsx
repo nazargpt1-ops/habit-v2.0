@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Clock, Bell, Trash2 } from 'lucide-react';
@@ -82,6 +83,8 @@ export const AddHabitModal: React.FC<HabitModalProps> = ({ isOpen, onClose, onSa
     medium: 'priority_medium',
     high: 'priority_high'
   };
+
+  const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   return (
     <AnimatePresence>
@@ -266,6 +269,13 @@ export const AddHabitModal: React.FC<HabitModalProps> = ({ isOpen, onClose, onSa
                                     />
                                   </div>
                                 </div>
+                            </div>
+                            
+                            {/* Timezone Indicator */}
+                            <div className="px-2 mt-1.5 text-right">
+                                <p className="text-[10px] text-secondary/50 font-medium tracking-wide">
+                                  Timezone: {userTimezone}
+                                </p>
                             </div>
                         </motion.div>
                     )}
