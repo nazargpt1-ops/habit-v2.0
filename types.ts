@@ -210,6 +210,9 @@ export interface Translations {
   badge_early_bird_desc: string;
   badge_locked: string;
 
+  // Sharing
+  share_message: string;
+
   // Quick Start Presets
   quick_start_title: string;
   quick_start_desc: string;
