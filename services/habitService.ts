@@ -77,12 +77,21 @@ export const ensureUserExists = async (): Promise<boolean> => {
   const userId = getCurrentUserId();
   const tgUser = typeof window !== 'undefined' ? window.Telegram?.WebApp?.initDataUnsafe?.user : undefined;
 
+  // Detect Timezone from browser
+  let timezone = 'UTC';
+  try {
+    timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch (e) {
+    console.warn("Timezone detection failed, defaulting to UTC");
+  }
+
   const userData = {
     telegram_id: userId,
     username: tgUser?.username || `user_${userId}`,
     first_name: tgUser?.first_name || 'Unknown',
     last_name: tgUser?.last_name || '',
-    language_code: tgUser?.language_code || 'en'
+    language_code: tgUser?.language_code || 'en',
+    timezone: timezone
   };
 
   try {
