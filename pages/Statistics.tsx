@@ -48,9 +48,12 @@ export const Statistics: React.FC = () => {
       window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
     }
 
-    // 2. Prepare Message
-    const text = `📊 My progress in HabitFlow:\n• Current Streak: ${currentStreak} days\n• Total Completed: ${totalCompletions}\n\nKeep consistent! 🚀`;
-    const appUrl = 'https://t.me/HabitFlowBot';
+    // 2. Prepare Message from Translations
+    const text = t.share_message
+        .replace('{streak}', currentStreak.toString())
+        .replace('{total}', totalCompletions.toString());
+
+    const appUrl = 'https://t.me/calendar_for_chenge_bot/app';
     
     // 3. Construct Telegram Share URL
     const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(appUrl)}&text=${encodeURIComponent(text)}`;
