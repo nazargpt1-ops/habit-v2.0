@@ -112,12 +112,21 @@ const dictionaries: Record<Language, Translations> = {
     last_365: "Last 365 Days",
     less: "Less",
     more: "More",
+    skill_tree: "Skill Tree",
     challenges_title: "Challenges",
     global_challenge: "Global Challenge",
     consistency_master: "Consistency Master",
     challenge_desc: "Complete 50 habits this month to unlock the badge",
     view_progress: "View Progress",
     new_badge: "New",
+
+    // RPG Stats
+    rpg_vit: "VIT (Health)",
+    rpg_int: "INT (Mind)",
+    rpg_dis: "DIS (Work)",
+    rpg_cha: "CHA (Social)",
+    rpg_wis: "WIS (Growth)",
+    rpg_sta: "STA (Energy)",
 
     // Achievements
     achievements_title: "Achievements",
@@ -250,12 +259,21 @@ const dictionaries: Record<Language, Translations> = {
     last_365: "За год",
     less: "Меньше",
     more: "Больше",
+    skill_tree: "Древо навыков",
     challenges_title: "Вызовы",
     global_challenge: "Глобальный вызов",
     consistency_master: "Мастер дисциплины",
     challenge_desc: "Выполни 50 привычек в этом месяце",
     view_progress: "Смотреть прогресс",
     new_badge: "Новое",
+
+    // RPG Stats
+    rpg_vit: "VIT (Здоровье)",
+    rpg_int: "INT (Интеллект)",
+    rpg_dis: "DIS (Дисциплина)",
+    rpg_cha: "CHA (Харизма)",
+    rpg_wis: "WIS (Мудрость)",
+    rpg_sta: "STA (Выносливость)",
 
     // Achievements
     achievements_title: "Достижения",
