@@ -447,83 +447,85 @@ export interface RPGStat {
 }
 
 export const fetchRPGStats = async (): Promise<RPGStat[]> => {
-  // Return Mock data if Supabase is not configured to let user see UI
+  // If Supabase is not configured, return mock to prevent crash but show empty state
   if (!isSupabaseConfigured || !supabase) {
-    return [
-      { subject: 'VIT', A: 45, fullMark: 100 },
-      { subject: 'INT', A: 70, fullMark: 100 },
-      { subject: 'DIS', A: 30, fullMark: 100 },
-      { subject: 'CHA', A: 60, fullMark: 100 },
-      { subject: 'WIS', A: 25, fullMark: 100 },
-      { subject: 'STA', A: 80, fullMark: 100 },
-    ];
+    return ['VIT', 'INT', 'DIS', 'CHA', 'WIS', 'STA'].map(s => ({ subject: s, A: 0, fullMark: 10 }));
   }
 
   const userId = getCurrentUserId();
 
-  // Mapping from our categories to RPG Stats
+  // 1. Define Mapping: Category -> RPG Stat
   const categoryMap: Record<string, string> = {
-    'Health': 'VIT',     // Vitality
-    'Mind': 'INT',       // Intellect
-    'Mindfulness': 'INT',
-    'Work': 'DIS',       // Discipline
-    'Social': 'CHA',     // Charisma
-    'Growth': 'WIS',     // Wisdom
-    'Energy': 'STA',     // Stamina
+    'health': 'VIT',
+    'mind': 'INT',
+    'mindfulness': 'INT', // Alias
+    'work': 'DIS',
+    'social': 'CHA',
+    'growth': 'WIS',
+    'energy': 'STA'
   };
 
+  // 2. Initialize Scores
   const scores: Record<string, number> = {
     'VIT': 0, 'INT': 0, 'DIS': 0, 'CHA': 0, 'WIS': 0, 'STA': 0
   };
 
   try {
-    // 1. Fetch completions and join with habit details to get category
+    // 3. Perform Join Query using the "habit:habits(category)" syntax as requested
     const { data: completions, error } = await supabase
       .from('completions')
-      .select('habit_id, habits (category)')
+      .select('habit_id, habit:habits(category)')
       .eq('user_id', userId);
 
-    if (error) throw error;
+    if (error) {
+      console.error("Supabase Error fetching RPG stats:", error);
+      throw error;
+    }
 
-    // 2. Aggregate scores
+    // 4. Process Results
     if (completions) {
       completions.forEach((item: any) => {
-        const habitData = Array.isArray(item.habits) ? item.habits[0] : item.habits;
-        const cat = habitData?.category || '';
+        // item.habit might be an object { category: '...' } or an array depending on 1:1 vs 1:M definition in Supabase
+        // Safe check for both structure
+        const habitData = Array.isArray(item.habit) ? item.habit[0] : item.habit;
         
-        let stat = categoryMap[cat];
-        
-        // Fallback for case-insensitive or slight variations
-        if (!stat) {
-           if (cat.toLowerCase().includes('health')) stat = 'VIT';
-           else if (cat.toLowerCase().includes('mind')) stat = 'INT';
-           else if (cat.toLowerCase().includes('work')) stat = 'DIS';
-           else if (cat.toLowerCase().includes('social')) stat = 'CHA';
-           else if (cat.toLowerCase().includes('growth')) stat = 'WIS';
-           else if (cat.toLowerCase().includes('energy')) stat = 'STA';
-        }
+        if (habitData && habitData.category) {
+          const catLower = habitData.category.toLowerCase().trim();
+          const statKey = categoryMap[catLower];
 
-        if (stat && scores[stat] !== undefined) {
-          scores[stat] += 1; // Increment by 1 per completion. Logic can be adjusted for difficulty.
+          // If direct map works
+          if (statKey && scores[statKey] !== undefined) {
+             scores[statKey] += 1; 
+          } 
+          // Fallback fuzzy search if exact map fails
+          else {
+             if (catLower.includes('health')) scores['VIT']++;
+             else if (catLower.includes('mind')) scores['INT']++;
+             else if (catLower.includes('work')) scores['DIS']++;
+             else if (catLower.includes('social')) scores['CHA']++;
+             else if (catLower.includes('growth')) scores['WIS']++;
+             else if (catLower.includes('energy')) scores['STA']++;
+          }
         }
       });
     }
 
-    // 3. Format for Recharts
+    // 5. Construct Final Data
     const order = ['VIT', 'INT', 'DIS', 'CHA', 'WIS', 'STA'];
     
-    // Determine dynamic fullMark (max value + buffer)
-    const maxVal = Math.max(...Object.values(scores), 1); 
-    const fullMark = Math.ceil(maxVal * 1.2); 
+    // Determine dynamic max for scale
+    const maxVal = Math.max(...Object.values(scores), 0); 
+    const fullMark = Math.max(Math.ceil(maxVal * 1.2), 10); // At least 10
 
     return order.map(subject => ({
       subject,
       A: scores[subject],
-      fullMark: fullMark < 10 ? 10 : fullMark // Minimum scale of 10
+      fullMark
     }));
 
   } catch (err) {
-    console.error("Error fetching RPG stats:", err);
+    console.error("Fatal error in fetchRPGStats:", err);
+    // Return zeroed out stats on error
     return ['VIT', 'INT', 'DIS', 'CHA', 'WIS', 'STA'].map(s => ({ subject: s, A: 0, fullMark: 10 }));
   }
 };
