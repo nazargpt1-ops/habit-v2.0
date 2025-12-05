@@ -115,7 +115,6 @@ export const ensureUserExists = async (): Promise<boolean> => {
 
     if (!response.ok) {
       console.error('User registration failed:', await response.text());
-      // Return false to indicate failure, but app might continue in "offline/read-only" state depending on usage
       return false;
     }
 
