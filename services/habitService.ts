@@ -83,7 +83,15 @@ export const ensureUserExists = async (): Promise<boolean> => {
   const userId = getCurrentUserId();
   const tgWebApp = typeof window !== 'undefined' ? window.Telegram?.WebApp : undefined;
   const tgUser = tgWebApp?.initDataUnsafe?.user;
-  const startParam = tgWebApp?.initDataUnsafe?.start_param;
+  
+  // 1. Try to get param from Telegram data
+  let startParam = tgWebApp?.initDataUnsafe?.start_param;
+
+  // 2. Fallback to URL parameters (passed by our Bot)
+  if (!startParam && typeof window !== 'undefined') {
+    const urlParams = new URLSearchParams(window.location.search);
+    startParam = urlParams.get('start_param') || undefined;
+  }
 
   // Detect Timezone from browser
   let timezone = 'UTC';
