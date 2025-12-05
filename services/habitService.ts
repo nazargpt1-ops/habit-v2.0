@@ -77,13 +77,10 @@ export const ensureUserExists = async (): Promise<boolean> => {
   if (hasVerifiedUser) return true;
 
   const userId = getCurrentUserId();
-  if (userId === TEST_USER_ID) { 
-    hasVerifiedUser = true; 
-    return true; 
-  }
+  if (userId === TEST_USER_ID) { hasVerifiedUser = true; return true; }
 
   const tgWebApp = window.Telegram?.WebApp;
-  
+
   // --- ЛОГИКА ЗАХВАТА РЕФЕРАЛКИ ---
   let startParam = tgWebApp?.initDataUnsafe?.start_param;
   console.log("🔍 DEBUG: Telegram initData param:", startParam);
@@ -99,30 +96,27 @@ export const ensureUserExists = async (): Promise<boolean> => {
     startParam = urlParams.get('tgWebAppStartParam') || undefined;
     console.log("🔍 DEBUG: tgWebAppStartParam:", startParam);
   }
-  
+
   console.log("✅ FINAL START PARAM TO SEND:", startParam);
   // --- КОНЕЦ ЛОГИКИ ЗАХВАТА ---
 
   let timezone = 'UTC';
-  try {
-    timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  } catch (e) {}
+  try { timezone = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) {}
 
   try {
-    const payload = {
-      telegram_id: userId,
-      username: tgWebApp?.initDataUnsafe?.user?.username || `user_${userId}`,
-      first_name: tgWebApp?.initDataUnsafe?.user?.first_name || 'Unknown',
-      last_name: tgWebApp?.initDataUnsafe?.user?.last_name || '',
-      language_code: tgWebApp?.initDataUnsafe?.user?.language_code || 'en',
-      timezone,
-      start_param: startParam,
-    };
-
+    // Объединяем: используем fetch один раз с правильными данными
     const response = await fetch('/api/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        telegram_id: userId,
+        username: tgWebApp?.initDataUnsafe?.user?.username || `user_${userId}`,
+        first_name: tgWebApp?.initDataUnsafe?.user?.first_name || 'Unknown',
+        last_name: tgWebApp?.initDataUnsafe?.user?.last_name || '',
+        language_code: tgWebApp?.initDataUnsafe?.user?.language_code || 'en',
+        timezone: timezone,
+        start_param: startParam 
+      }),
     });
 
     if (!response.ok) {
@@ -132,12 +126,12 @@ export const ensureUserExists = async (): Promise<boolean> => {
 
     hasVerifiedUser = true;
     return true;
+
   } catch (err) {
     console.error("Network error during user registration:", err);
     return false;
   }
 };
-
 
   try {
     // Call Serverless Function to handle logic with Admin privileges
