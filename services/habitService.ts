@@ -88,6 +88,8 @@ export const ensureUserExists = async (): Promise<boolean> => {
 
     if (fetchError) {
         console.error("Error checking user existence:", fetchError);
+        // Don't return false immediately, maybe we can still insert? 
+        // But likely DB connection issue.
         return false;
     }
 
@@ -128,6 +130,7 @@ export const ensureUserExists = async (): Promise<boolean> => {
        
        // Basic validation: Referrer exists, is valid number, and not self-referral
        if (!isNaN(referrerId) && referrerId !== userId) {
+          // Attempt to find referrer to ensure validity (and potentially respect RLS if possible)
           const { data: referrer } = await supabase
             .from('users')
             .select('telegram_id')
@@ -137,6 +140,13 @@ export const ensureUserExists = async (): Promise<boolean> => {
           if (referrer) {
              referredBy = referrerId;
              initialXp = 50; // Bonus for being referred
+          } else {
+             // FALLBACK: If RLS hides the user, we might still want to try inserting with the ID.
+             // If the DB has a foreign key constraint, the insert will fail, and we can catch that.
+             // If we don't try, valid referrals might be missed due to client-side RLS restrictions.
+             console.log("Referrer not found via Select (RLS?), trying optimistic link:", referrerId);
+             referredBy = referrerId;
+             initialXp = 50; 
           }
        }
     }
@@ -160,27 +170,46 @@ export const ensureUserExists = async (): Promise<boolean> => {
       .insert(userData);
 
     if (insertError) {
-       console.error("Error creating user:", insertError);
-       return false;
+       // Check for Foreign Key Violation (Postgres Code 23503)
+       // This happens if we optimistically set referred_by but the user doesn't exist in DB
+       if (insertError.code === '23503') {
+           console.warn("Referrer ID invalid (FK Violation), creating user without referral.");
+           const fallbackData = { ...userData, referred_by: null, xp: 0 };
+           const { error: retryError } = await supabase.from('users').insert(fallbackData);
+           
+           if (retryError) {
+               console.error("Error creating user (fallback):", retryError);
+               return false;
+           }
+       } else {
+           console.error("Error creating user:", insertError);
+           return false;
+       }
     }
 
     // 4. Reward Referrer
+    // Note: This might fail silently if RLS prevents updating other users.
+    // Ideally, this should be a Database Trigger or Edge Function.
     if (referredBy) {
-         const { data: referrerData } = await supabase
-           .from('users')
-           .select('xp, level')
-           .eq('telegram_id', referredBy)
-           .single();
-           
-         if (referrerData) {
-            // Reward Referrer (+100 XP)
-            const newRefXp = (referrerData.xp || 0) + 100;
-            const newRefLevel = Math.floor(newRefXp / 100) + 1;
-            
-            await supabase
-              .from('users')
-              .update({ xp: newRefXp, level: newRefLevel })
-              .eq('telegram_id', referredBy);
+         try {
+             const { data: referrerData } = await supabase
+               .from('users')
+               .select('xp, level')
+               .eq('telegram_id', referredBy)
+               .maybeSingle(); // Use maybeSingle to avoid errors
+               
+             if (referrerData) {
+                // Reward Referrer (+100 XP)
+                const newRefXp = (referrerData.xp || 0) + 100;
+                const newRefLevel = Math.floor(newRefXp / 100) + 1;
+                
+                await supabase
+                  .from('users')
+                  .update({ xp: newRefXp, level: newRefLevel })
+                  .eq('telegram_id', referredBy);
+             }
+         } catch (e) {
+             console.warn("Could not reward referrer (likely RLS restriction):", e);
          }
     }
 
