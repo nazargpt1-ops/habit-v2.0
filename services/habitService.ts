@@ -69,154 +69,60 @@ const calculateStreak = (completions: Completion[]): number => {
 
 // --- CORE SERVICE ---
 
+/**
+ * Ensures the user exists in the database by calling the server-side API.
+ * This handles authentication, metadata updates, and referral logic securely.
+ */
 export const ensureUserExists = async (): Promise<boolean> => {
-  // If no Supabase config, assume success (Mock Mode)
-  if (!isSupabaseConfigured || !supabase) return true;
+  // If we've already verified the user in this session, skip
+  if (hasVerifiedUser) return true;
+
+  // If no Supabase config is present on client, assume Mock Mode
+  if (!isSupabaseConfigured) return true;
 
   const userId = getCurrentUserId();
   const tgWebApp = typeof window !== 'undefined' ? window.Telegram?.WebApp : undefined;
   const tgUser = tgWebApp?.initDataUnsafe?.user;
   const startParam = tgWebApp?.initDataUnsafe?.start_param;
 
+  // Detect Timezone from browser
+  let timezone = 'UTC';
   try {
-    // 1. Check if user already exists (Select ONLY telegram_id)
-    const { data: existingUser, error: fetchError } = await supabase
-      .from('users')
-      .select('telegram_id')
-      .eq('telegram_id', userId)
-      .maybeSingle();
+    timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch (e) {
+    console.warn("Timezone detection failed, defaulting to UTC");
+  }
 
-    if (fetchError) {
-        console.error("Error checking user existence:", fetchError);
-        // Don't return false immediately, maybe we can still insert? 
-        // But likely DB connection issue.
-        return false;
-    }
+  const payload = {
+    telegram_id: userId,
+    username: tgUser?.username || `user_${userId}`,
+    first_name: tgUser?.first_name || 'Unknown',
+    last_name: tgUser?.last_name || '',
+    language_code: tgUser?.language_code || 'en',
+    timezone: timezone,
+    start_param: startParam
+  };
 
-    // Detect Timezone from browser
-    let timezone = 'UTC';
-    try {
-      timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    } catch (e) {
-      console.warn("Timezone detection failed, defaulting to UTC");
-    }
+  try {
+    // Call Serverless Function to handle logic with Admin privileges
+    const response = await fetch('/api/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
 
-    if (existingUser) {
-      // 2. Existing User: Update metadata (username, etc.) but NOT referred_by
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({
-            username: tgUser?.username || `user_${userId}`,
-            first_name: tgUser?.first_name || 'Unknown',
-            last_name: tgUser?.last_name || '',
-            language_code: tgUser?.language_code || 'en',
-            timezone: timezone
-        })
-        .eq('telegram_id', userId);
-
-      if (updateError) console.error("Error updating user metadata:", updateError);
-      
-      hasVerifiedUser = true;
-      return true;
-    }
-
-    // 3. New User (Referral Logic)
-    let referredBy: number | null = null;
-    let initialXp = 0; // Default start
-
-    if (startParam && startParam.startsWith('ref_')) {
-       const referrerIdRaw = startParam.split('ref_')[1];
-       const referrerId = parseInt(referrerIdRaw, 10);
-       
-       // Basic validation: Referrer exists, is valid number, and not self-referral
-       if (!isNaN(referrerId) && referrerId !== userId) {
-          // Attempt to find referrer to ensure validity (and potentially respect RLS if possible)
-          const { data: referrer } = await supabase
-            .from('users')
-            .select('telegram_id')
-            .eq('telegram_id', referrerId)
-            .maybeSingle();
-            
-          if (referrer) {
-             referredBy = referrerId;
-             initialXp = 50; // Bonus for being referred
-          } else {
-             // FALLBACK: If RLS hides the user, we might still want to try inserting with the ID.
-             // If the DB has a foreign key constraint, the insert will fail, and we can catch that.
-             // If we don't try, valid referrals might be missed due to client-side RLS restrictions.
-             console.log("Referrer not found via Select (RLS?), trying optimistic link:", referrerId);
-             referredBy = referrerId;
-             initialXp = 50; 
-          }
-       }
-    }
-
-    // Prepare User Data (Explicitly include referred_by)
-    const userData = {
-      telegram_id: userId,
-      username: tgUser?.username || `user_${userId}`,
-      first_name: tgUser?.first_name || 'Unknown',
-      last_name: tgUser?.last_name || '',
-      language_code: tgUser?.language_code || 'en',
-      timezone: timezone,
-      referred_by: referredBy,
-      xp: initialXp,
-      level: 1,
-      total_coins: 0
-    };
-
-    const { error: insertError } = await supabase
-      .from('users')
-      .insert(userData);
-
-    if (insertError) {
-       // Check for Foreign Key Violation (Postgres Code 23503)
-       // This happens if we optimistically set referred_by but the user doesn't exist in DB
-       if (insertError.code === '23503') {
-           console.warn("Referrer ID invalid (FK Violation), creating user without referral.");
-           const fallbackData = { ...userData, referred_by: null, xp: 0 };
-           const { error: retryError } = await supabase.from('users').insert(fallbackData);
-           
-           if (retryError) {
-               console.error("Error creating user (fallback):", retryError);
-               return false;
-           }
-       } else {
-           console.error("Error creating user:", insertError);
-           return false;
-       }
-    }
-
-    // 4. Reward Referrer
-    // Note: This might fail silently if RLS prevents updating other users.
-    // Ideally, this should be a Database Trigger or Edge Function.
-    if (referredBy) {
-         try {
-             const { data: referrerData } = await supabase
-               .from('users')
-               .select('xp, level')
-               .eq('telegram_id', referredBy)
-               .maybeSingle(); // Use maybeSingle to avoid errors
-               
-             if (referrerData) {
-                // Reward Referrer (+100 XP)
-                const newRefXp = (referrerData.xp || 0) + 100;
-                const newRefLevel = Math.floor(newRefXp / 100) + 1;
-                
-                await supabase
-                  .from('users')
-                  .update({ xp: newRefXp, level: newRefLevel })
-                  .eq('telegram_id', referredBy);
-             }
-         } catch (e) {
-             console.warn("Could not reward referrer (likely RLS restriction):", e);
-         }
+    if (!response.ok) {
+      console.error('User registration failed:', await response.text());
+      // Return false to indicate failure, but app might continue in "offline/read-only" state depending on usage
+      return false;
     }
 
     hasVerifiedUser = true;
     return true;
   } catch (err) {
-    console.error("ensureUserExists failed:", err);
+    console.error("Network error during user registration:", err);
     return false;
   }
 };
