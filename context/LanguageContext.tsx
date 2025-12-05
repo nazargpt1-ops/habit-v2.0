@@ -143,6 +143,12 @@ const dictionaries: Record<Language, Translations> = {
     // Sharing
     share_message: "I'm building better habits with HabitFlow! 🚀\n\n🔥 Current Streak: {streak} days\n🏆 Total Habits: {total}\n\nJoin me and level up your life! 👇",
 
+    // Referral
+    referral_title: "Invite Friends & Earn XP",
+    referral_desc: "Get +100 XP for every friend who joins.",
+    referral_btn: "Invite Friend",
+    referral_share_text: "Join me in HabitFlow and level up your life! 🚀",
+
     // Quick Start Presets
     quick_start_title: "Quick Start",
     quick_start_desc: "Choose a template to begin",
@@ -292,6 +298,12 @@ const dictionaries: Record<Language, Translations> = {
 
     // Sharing
     share_message: "Я прокачиваю привычки в HabitFlow! 🚀\n\n🔥 Текущая серия: {streak} дн.\n🏆 Выполнено: {total}\n\nПрисоединяйся, попробуем не слиться вместе! 👇",
+
+    // Referral
+    referral_title: "Пригласи друга",
+    referral_desc: "Получи +100 XP за каждого друга.",
+    referral_btn: "Пригласить",
+    referral_share_text: "Присоединяйся ко мне в HabitFlow и прокачивай свою жизнь! 🚀",
 
     // Quick Start Presets
     quick_start_title: "Быстрый старт",
