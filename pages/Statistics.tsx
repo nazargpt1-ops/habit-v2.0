@@ -5,7 +5,7 @@ import { AchievementsGrid } from '../components/AchievementsGrid';
 import { RPGChart } from '../components/RPGChart';
 import { ReferralCard } from '../components/ReferralCard';
 import { useLanguage } from '../context/LanguageContext';
-import { fetchHeatmapData, fetchUserProfile, fetchRPGStats, HeatmapData, RPGStat } from '../services/habitService';
+import { fetchHeatmapData, fetchUserProfile, fetchRPGStats, HeatmapData, RPGStat, ensureUserExists } from '../services/habitService';
 import { User } from '../types';
 import { Trophy, Flame, CheckCircle2, TrendingUp, Share2 } from 'lucide-react';
 
@@ -22,6 +22,9 @@ export const Statistics: React.FC = () => {
     const loadStats = async () => {
       setIsLoading(true);
       try {
+        // Ensure user is created before fetching stats/profile
+        await ensureUserExists();
+
         // Service determines user context internally
         const [stats, rpg, profile] = await Promise.all([
           fetchHeatmapData(),
