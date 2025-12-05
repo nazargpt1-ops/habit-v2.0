@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Dashboard } from './pages/Dashboard';
 import { Statistics } from './pages/Statistics';
@@ -7,9 +8,11 @@ import { initTelegramApp } from './lib/telegram';
 import { Tab, Priority } from './types';
 import { LayoutGrid, BarChart3, Plus } from 'lucide-react';
 import { cn } from './lib/utils';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion as m, AnimatePresence } from 'framer-motion';
 import { AddHabitModal } from './components/AddHabitModal';
 import { createHabit } from './services/habitService';
+
+const motion = m as any;
 
 // Inner component to use contexts
 const AppContent = () => {
