@@ -1,11 +1,13 @@
 
 import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion as m, AnimatePresence } from 'framer-motion';
 import { X, Calendar, Zap, FileText } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { HabitWithCompletion, Completion } from '../types';
 import { cn } from '../lib/utils';
 import { fetchHabitHistory, updateCompletionNote } from '../services/habitService';
+
+const motion = m as any;
 
 interface HabitDetailsModalProps {
   isOpen: boolean;
