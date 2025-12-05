@@ -1,4 +1,3 @@
-
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 import { Habit, Completion, HabitWithCompletion, Priority, User } from '../types';
 import { formatDateKey } from '../lib/utils';
@@ -89,10 +88,11 @@ export const ensureUserExists = async (): Promise<boolean> => {
   }
 
   try {
-    // 1. CRITICAL: Check if user ALREADY exists first
+    // 1. CRITICAL FIX: Removed 'id' from select, as column does not exist.
+    // Checking only by telegram_id.
     const { data: existingUser, error: checkError } = await supabase
       .from('users')
-      .select('id, telegram_id')
+      .select('telegram_id') 
       .eq('telegram_id', userId)
       .maybeSingle();
 
@@ -132,7 +132,7 @@ export const ensureUserExists = async (): Promise<boolean> => {
        const referrerId = parseInt(referrerIdRaw, 10);
        
        // Validation: 1. Is Number, 2. Not self-referral
-       if (!isNaN(referrerId) && referrerId !== userId) {
+       if (!isNaN(referrerId) && referrerId !== Number(userId)) {
           // 3. Verify Referrer exists in DB (integrity check)
           const { data: referrerProbe } = await supabase
             .from('users')
