@@ -14,6 +14,7 @@ declare global {
             username?: string;
             language_code?: string;
           };
+          start_param?: string;
         };
         themeParams: {
           bg_color?: string;
