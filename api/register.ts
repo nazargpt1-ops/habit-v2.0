@@ -6,7 +6,13 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // CORS Handling (Optional, if calling from different domain, but usually not needed for /api/*)
+  // 1. Handle CORS headers to allow requests from the client
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+
+  // Handle preflight request
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -37,7 +43,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // 1. Check if user already exists
+    // 3. Check Existence
     const { data: existingUser, error: fetchError } = await supabase
       .from('users')
       .select('telegram_id')
@@ -47,7 +53,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (fetchError) throw fetchError;
 
     if (existingUser) {
-      // --- Existing User: Update Metadata Only ---
+      // 4. Existing User: Update Metadata Only
       const { error: updateError } = await supabase
         .from('users')
         .update({
@@ -56,20 +62,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           last_name,
           language_code,
           timezone,
-          // timestamps usually handled by DB defaults, or updated_at trigger
         })
         .eq('telegram_id', telegram_id);
 
       if (updateError) throw updateError;
       
-      return res.status(200).json({ status: 'updated', message: 'User metadata updated' });
+      return res.status(200).json({ status: 'ok', message: 'User metadata updated' });
     }
 
-    // --- New User Logic ---
+    // 5. New User Logic
     let referredBy: number | null = null;
     let initialXp = 0;
 
-    // 2. Process Referral
+    // Process Referral
     if (start_param && start_param.startsWith('ref_')) {
       const referrerIdRaw = start_param.split('ref_')[1];
       const referrerId = parseInt(referrerIdRaw, 10);
@@ -103,7 +108,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // 3. Create User
+    // Insert New User
     const { error: insertError } = await supabase
       .from('users')
       .insert({
@@ -121,7 +126,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (insertError) throw insertError;
 
-    return res.status(200).json({ status: 'created', message: 'User created successfully' });
+    return res.status(200).json({ status: 'ok', message: 'User created successfully' });
 
   } catch (error: any) {
     console.error('Registration Error:', error);
