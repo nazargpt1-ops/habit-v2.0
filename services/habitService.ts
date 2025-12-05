@@ -17,45 +17,121 @@ export const getCurrentUserId = (): number | string => {
   return userId;
 };
 
-/**
- * Calculates the current global streak based on a list of date strings.
- * Assumes dates are YYYY-MM-DD.
- */
-const calculateGlobalStreakFromDates = (dates: string[]): number => {
-  if (!dates || dates.length === 0) return 0;
-  
-  // Sort descending
-  const uniqueDates = Array.from(new Set(dates)).sort((a, b) => b.localeCompare(a));
-  
-  const todayStr = formatDateKey(new Date());
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = formatDateKey(yesterday);
+// --- CORE SERVICE ---
 
-  // Check if streak is alive (latest completion must be today or yesterday)
-  if (uniqueDates[0] !== todayStr && uniqueDates[0] !== yesterdayStr) {
-    return 0;
-  }
+export const ensureUserExists = async (): Promise<boolean> => {
+  if (hasVerifiedUser) return true;
+  if (!isSupabaseConfigured || !supabase) return true;
 
-  let streak = 0;
-  let currentCheckDate = new Date();
-  
-  // If latest is yesterday, start checking from yesterday
-  if (uniqueDates[0] !== todayStr) {
-     currentCheckDate.setDate(currentCheckDate.getDate() - 1);
-  }
+  const userId = getCurrentUserId();
+  const tgWebApp = typeof window !== 'undefined' ? window.Telegram?.WebApp : undefined;
+  const tgUser = tgWebApp?.initDataUnsafe?.user;
+  const startParam = tgWebApp?.initDataUnsafe?.start_param;
 
-  for (let i = 0; i < uniqueDates.length; i++) {
-    const checkStr = formatDateKey(currentCheckDate);
-    if (uniqueDates.includes(checkStr)) {
-      streak++;
-      currentCheckDate.setDate(currentCheckDate.getDate() - 1);
-    } else {
-      break;
+  // Timezone
+  let timezone = 'UTC';
+  try { timezone = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) {}
+
+  try {
+    // 1. Проверяем, есть ли юзер
+    const { data: existingUser, error: checkError } = await supabase
+      .from('users')
+      .select('telegram_id') 
+      .eq('telegram_id', userId)
+      .maybeSingle();
+
+    if (checkError) {
+      console.error("Check user error:", checkError);
+      return false;
     }
-  }
 
-  return streak;
+    // 2. Если есть - просто обновляем метаданные
+    if (existingUser) {
+      console.log("User exists, updating metadata...");
+      await supabase.from('users').update({
+        username: tgUser?.username || `user_${userId}`,
+        first_name: tgUser?.first_name || 'Unknown',
+        last_name: tgUser?.last_name || '',
+        language_code: tgUser?.language_code || 'en',
+        timezone: timezone
+      }).eq('telegram_id', userId);
+
+      hasVerifiedUser = true;
+      return true;
+    }
+
+    // 3. НОВЫЙ ЮЗЕР: Обработка рефералки
+    console.log("Creating NEW user...");
+    let referredBy: number | null = null;
+    let initialXp = 0;
+    const initialLevel = 1;
+
+    // Логируем, что пришло в параметрах
+    console.log("Start Param:", startParam);
+
+    if (startParam && startParam.startsWith('ref_')) {
+       const refString = startParam.split('ref_')[1];
+       const referrerId = parseInt(refString, 10);
+       
+       // Простая проверка: это число и не сам пользователь
+       if (!isNaN(referrerId) && referrerId !== Number(userId)) {
+          referredBy = referrerId;
+          initialXp = 50; // Бонус новичку
+          console.log("Valid referral detected from:", referredBy);
+       }
+    }
+
+    // Вставка пользователя
+    const userData = {
+      telegram_id: userId,
+      username: tgUser?.username || `user_${userId}`,
+      first_name: tgUser?.first_name || 'Unknown',
+      last_name: tgUser?.last_name || '',
+      language_code: tgUser?.language_code || 'en',
+      timezone: timezone,
+      referred_by: referredBy, // <--- Вот здесь должно записаться
+      xp: initialXp, 
+      level: initialLevel,
+      total_coins: 0
+    };
+
+    const { error: insertError } = await supabase
+      .from('users')
+      .insert(userData);
+
+    if (insertError) {
+       console.error("Insert user error:", insertError);
+       return false;
+    }
+
+    // 4. Награда пригласившему (отдельный запрос)
+    if (referredBy) {
+       console.log("Rewarding referrer:", referredBy);
+       
+       // Сначала получаем текущий опыт пригласившего
+       const { data: referrer } = await supabase
+         .from('users')
+         .select('xp')
+         .eq('telegram_id', referredBy)
+         .single();
+
+       if (referrer) {
+         const newXp = (referrer.xp || 0) + 100;
+         const newLevel = Math.floor(newXp / 100) + 1;
+         
+         await supabase
+           .from('users')
+           .update({ xp: newXp, level: newLevel })
+           .eq('telegram_id', referredBy);
+       }
+    }
+
+    hasVerifiedUser = true;
+    return true;
+  } catch (err) {
+    console.error("Fatal ensureUserExists:", err);
+    return false;
+  }
 };
 
 /**
