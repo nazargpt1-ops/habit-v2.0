@@ -1,10 +1,11 @@
-
 import React, { useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { motion as m } from 'framer-motion';
 import { Footprints, Flame, Trophy, Sunrise, Lock } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { User, Translations } from '../types';
 import { cn } from '../lib/utils';
+
+const motion = m as any;
 
 interface AchievementsGridProps {
   user: User | null;
