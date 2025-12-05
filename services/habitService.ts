@@ -75,35 +75,87 @@ export const ensureUserExists = async (): Promise<boolean> => {
   if (!isSupabaseConfigured || !supabase) return true;
 
   const userId = getCurrentUserId();
-  const tgUser = typeof window !== 'undefined' ? window.Telegram?.WebApp?.initDataUnsafe?.user : undefined;
-
-  // Detect Timezone from browser
-  let timezone = 'UTC';
-  try {
-    timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  } catch (e) {
-    console.warn("Timezone detection failed, defaulting to UTC");
-  }
-
-  const userData = {
-    telegram_id: userId,
-    username: tgUser?.username || `user_${userId}`,
-    first_name: tgUser?.first_name || 'Unknown',
-    last_name: tgUser?.last_name || '',
-    language_code: tgUser?.language_code || 'en',
-    timezone: timezone
-  };
+  const tgWebApp = typeof window !== 'undefined' ? window.Telegram?.WebApp : undefined;
+  const tgUser = tgWebApp?.initDataUnsafe?.user;
+  const startParam = tgWebApp?.initDataUnsafe?.start_param;
 
   try {
+    // 1. Check if user already exists
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('telegram_id', userId)
+      .maybeSingle();
+
+    if (existingUser) {
+      hasVerifiedUser = true;
+      return true;
+    }
+
+    // 2. User is NEW. Process Referral Logic.
+    let referredBy: number | undefined = undefined;
+    let bonusXp = 50; // New user bonus
+
+    if (startParam && startParam.startsWith('ref_')) {
+       const referrerIdRaw = startParam.split('ref_')[1];
+       const referrerId = parseInt(referrerIdRaw, 10);
+       
+       // Basic validation: Referrer exists, is valid number, and not self-referral
+       if (!isNaN(referrerId) && referrerId !== userId) {
+          const { data: referrer } = await supabase
+            .from('users')
+            .select('telegram_id, xp, total_coins')
+            .eq('telegram_id', referrerId)
+            .maybeSingle();
+            
+          if (referrer) {
+             referredBy = referrerId;
+             
+             // Reward Referrer (+100 XP)
+             const newRefXp = (referrer.xp || 0) + 100;
+             const newRefLevel = Math.floor(newRefXp / 100) + 1;
+             
+             await supabase
+               .from('users')
+               .update({ xp: newRefXp, level: newRefLevel })
+               .eq('telegram_id', referrerId);
+          }
+       }
+    }
+
+    // Detect Timezone from browser
+    let timezone = 'UTC';
+    try {
+      timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch (e) {
+      console.warn("Timezone detection failed, defaulting to UTC");
+    }
+
+    const userData = {
+      telegram_id: userId,
+      username: tgUser?.username || `user_${userId}`,
+      first_name: tgUser?.first_name || 'Unknown',
+      last_name: tgUser?.last_name || '',
+      language_code: tgUser?.language_code || 'en',
+      timezone: timezone,
+      referred_by: referredBy,
+      xp: bonusXp, // Give initial XP
+      level: 1
+    };
+
     const { error } = await supabase
       .from('users')
-      .upsert(userData, { onConflict: 'telegram_id' });
+      .insert(userData);
 
-    if (error) return false;
+    if (error) {
+       console.error("Error creating user:", error);
+       return false;
+    }
 
     hasVerifiedUser = true;
     return true;
   } catch (err) {
+    console.error("ensureUserExists failed:", err);
     return false;
   }
 };
