@@ -38,36 +38,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // --- ШАГ 1: Пробуем найти пользователя ---
+    // --- STEP 1: Check if user exists ---
     const { data: existingUser, error: fetchError } = await supabase
       .from('users')
       .select('telegram_id')
       .eq('telegram_id', telegram_id)
       .maybeSingle();
 
-    if (fetchError) throw fetchError;
+    if (fetchError) {
+      console.error("[REGISTER] Fetch Error:", JSON.stringify(fetchError));
+      throw fetchError;
+    }
 
-    // Если пользователь уже есть — обновляем и выходим (Рефералка не срабатывает для старых)
+    // If user exists, update metadata
     if (existingUser) {
-      await supabase.from('users').update({
-          username, first_name, last_name, language_code, timezone
-        }).eq('telegram_id', telegram_id);
+      const updatePayload = {
+        username: username || null,
+        first_name: first_name || null,
+        last_name: last_name || null,
+        language_code: language_code || null,
+        timezone: timezone || 'UTC'
+      };
+
+      const { error: updateError } = await supabase
+        .from('users')
+        .update(updatePayload)
+        .eq('telegram_id', telegram_id);
       
+      if (updateError) {
+        console.error("[REGISTER] Update Error:", JSON.stringify(updateError));
+        // We do not throw here to allow the process to "succeed" even if metadata update fails slightly
+      }
+
       return res.status(200).json({ status: 'ok', message: 'User updated' });
     }
 
-    // --- ШАГ 2: Логика для НОВОГО пользователя ---
+    // --- STEP 2: Logic for NEW user ---
     let referredBy: number | null = null;
     let initialXp = 0;
     let referrerToReward: number | null = null;
 
-    // Парсим реферальную ссылку
-    if (start_param && start_param.startsWith('ref_')) {
-      const refIdString = start_param.replace(/\D/g, ''); // Оставляем только цифры
+    // Parse referral
+    if (start_param && typeof start_param === 'string' && start_param.startsWith('ref_')) {
+      const refIdString = start_param.replace(/\D/g, ''); 
       const referrerId = parseInt(refIdString, 10);
 
       if (!isNaN(referrerId) && referrerId !== telegram_id) {
-        // Проверяем, существует ли тот, кто пригласил
+        // Check referrer existence
         const { data: referrer } = await supabase
           .from('users')
           .select('telegram_id')
@@ -76,47 +93,56 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         if (referrer) {
           referredBy = referrerId;
-          initialXp = 50; // Бонус новичку
-          referrerToReward = referrerId; // Запоминаем, кого наградить
+          initialXp = 50; 
+          referrerToReward = referrerId;
           console.log(`[REGISTER] Valid referral: ${telegram_id} invited by ${referrerId}`);
         }
       }
     }
 
-    // --- ШАГ 3: Пытаемся создать (INSERT/UPSERT) ---
-    // Use upsert with ignoreDuplicates to handle race conditions without 409 errors
-    // .select() is required to check if we actually inserted a row
+    // --- STEP 3: Create User ---
+    const newUserPayload = {
+      telegram_id: telegram_id,
+      username: username || null, // Convert empty strings to null
+      first_name: first_name || null,
+      last_name: last_name || null,
+      language_code: language_code || null,
+      timezone: timezone || 'UTC',
+      referred_by: referredBy,
+      xp: initialXp,
+      level: 1,
+      total_coins: 0,
+      current_streak: 0
+    };
+
+    console.log("[REGISTER] Inserting:", JSON.stringify(newUserPayload));
+
+    // Use Upsert with ignoreDuplicates to handle race conditions safely
     const { data: insertedUser, error: upsertError } = await supabase
       .from('users')
-      .upsert({
-        telegram_id,
-        username,
-        first_name,
-        last_name,
-        language_code,
-        timezone,
-        referred_by: referredBy,
-        xp: initialXp,
-        level: 1,
-        total_coins: 0,
-        current_streak: 0
-      }, { onConflict: 'telegram_id', ignoreDuplicates: true })
+      .upsert(newUserPayload, { onConflict: 'telegram_id', ignoreDuplicates: true })
       .select();
 
-    if (upsertError) throw upsertError;
+    if (upsertError) {
+      console.error("[REGISTER] Supabase Insert/Upsert Error:", JSON.stringify(upsertError));
+      throw upsertError;
+    }
 
-    // --- ШАГ 4: Update Fallback (Explicit) ---
-    // If no user inserted (duplicate) and no error, it means we hit a race condition or the user existed
-    // We update metadata just in case.
+    // --- STEP 4: Update Fallback ---
+    // If ignoreDuplicates: true triggered (user exists due to race condition), insertedUser might be empty.
+    // We update metadata just in case to ensure fresh names/timezone.
     if (!insertedUser || insertedUser.length === 0) {
         await supabase.from('users').update({
-            username, first_name, last_name, language_code, timezone
+            username: username || null,
+            first_name: first_name || null,
+            last_name: last_name || null,
+            language_code: language_code || null,
+            timezone: timezone || 'UTC'
         }).eq('telegram_id', telegram_id);
     }
 
-    // --- ШАГ 5: Награда пригласившему ---
-    // Only reward if we actually inserted a new user (insertedUser array has items)
-    // This prevents double rewarding in race conditions.
+    // --- STEP 5: Reward Referrer ---
+    // Only reward if we actually inserted a new user (to prevent abuse/double counting)
     if (referrerToReward && insertedUser && insertedUser.length > 0) {
       try {
         const { data: currentRef } = await supabase
@@ -143,7 +169,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ status: 'ok', message: 'User processed' });
 
   } catch (error: any) {
-    console.error('Registration API Error:', error);
+    console.error('[REGISTER] FATAL API ERROR:', error);
     return res.status(500).json({ error: error.message || 'Internal Server Error' });
   }
 }
