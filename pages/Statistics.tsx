@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { HistoryHeatmap } from '../components/HistoryHeatmap';
 import { AchievementsGrid } from '../components/AchievementsGrid';
 import { RPGChart } from '../components/RPGChart';
+import { ReferralCard } from '../components/ReferralCard';
 import { useLanguage } from '../context/LanguageContext';
 import { fetchHeatmapData, fetchUserProfile, fetchRPGStats, HeatmapData, RPGStat } from '../services/habitService';
 import { User } from '../types';
@@ -131,6 +132,9 @@ export const Statistics: React.FC = () => {
                  </div>
             </div>
         </div>
+        
+        {/* Referral Card */}
+        <ReferralCard />
 
         {/* Achievements Section */}
         {!isLoading && (
