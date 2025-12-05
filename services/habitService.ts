@@ -77,51 +77,67 @@ export const ensureUserExists = async (): Promise<boolean> => {
   if (hasVerifiedUser) return true;
 
   const userId = getCurrentUserId();
-  if (userId === TEST_USER_ID) { hasVerifiedUser = true; return true; }
+  if (userId === TEST_USER_ID) { 
+    hasVerifiedUser = true; 
+    return true; 
+  }
 
   const tgWebApp = window.Telegram?.WebApp;
   
   // --- ЛОГИКА ЗАХВАТА РЕФЕРАЛКИ ---
-  
-  // 1. Ищем в нативных данных Телеграма (для t.me ссылок)
   let startParam = tgWebApp?.initDataUnsafe?.start_param;
   console.log("🔍 DEBUG: Telegram initData param:", startParam);
 
-  // 2. Если там пусто — ищем в URL (для кнопок с явным параметром)
   if (!startParam && typeof window !== 'undefined') {
     const urlParams = new URLSearchParams(window.location.search);
     startParam = urlParams.get('start_param') || undefined;
     console.log("🔍 DEBUG: URL Query param:", startParam);
   }
 
-  // 3. Если все еще пусто — проверяем 'tgWebAppStartParam' (иногда бывает тут)
   if (!startParam && typeof window !== 'undefined') {
-     const urlParams = new URLSearchParams(window.location.search);
-     startParam = urlParams.get('tgWebAppStartParam') || undefined;
-     console.log("🔍 DEBUG: tgWebAppStartParam:", startParam);
+    const urlParams = new URLSearchParams(window.location.search);
+    startParam = urlParams.get('tgWebAppStartParam') || undefined;
+    console.log("🔍 DEBUG: tgWebAppStartParam:", startParam);
   }
   
   console.log("✅ FINAL START PARAM TO SEND:", startParam);
-
   // --- КОНЕЦ ЛОГИКИ ЗАХВАТА ---
 
   let timezone = 'UTC';
-  try { timezone = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) {}
+  try {
+    timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch (e) {}
 
   try {
+    const payload = {
+      telegram_id: userId,
+      username: tgWebApp?.initDataUnsafe?.user?.username || `user_${userId}`,
+      first_name: tgWebApp?.initDataUnsafe?.user?.first_name || 'Unknown',
+      last_name: tgWebApp?.initDataUnsafe?.user?.last_name || '',
+      language_code: tgWebApp?.initDataUnsafe?.user?.language_code || 'en',
+      timezone,
+      start_param: startParam,
+    };
+
     const response = await fetch('/api/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        telegram_id: userId,
-        username: tgWebApp?.initDataUnsafe?.user?.username || `user_${userId}`,
-        first_name: tgWebApp?.initDataUnsafe?.user?.first_name || 'Unknown',
-        last_name: tgWebApp?.initDataUnsafe?.user?.last_name || '',
-        language_code: tgWebApp?.initDataUnsafe?.user?.language_code || 'en',
-        timezone: timezone,
-        start_param: startParam // Отправляем то, что нашли
-      }),
+      body: JSON.stringify(payload),
     });
+
+    if (!response.ok) {
+      console.error('User registration failed:', await response.text());
+      return false;
+    }
+
+    hasVerifiedUser = true;
+    return true;
+  } catch (err) {
+    console.error("Network error during user registration:", err);
+    return false;
+  }
+};
+
 
   try {
     // Call Serverless Function to handle logic with Admin privileges
