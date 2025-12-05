@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion as m, AnimatePresence } from 'framer-motion';
 import { Calendar as CalendarIcon, Inbox, Sun, Moon, Zap } from 'lucide-react';
 import { CalendarStrip } from '../components/CalendarStrip';
 import { HabitCard } from '../components/HabitCard';
@@ -19,12 +19,15 @@ import {
   updateHabit, 
   createHabit, 
   deleteHabit,
-  fetchUserProfile
+  fetchUserProfile,
+  ensureUserExists
 } from '../services/habitService';
 import { HabitWithCompletion, Habit, Priority, User } from '../types';
 import { hapticImpact, hapticSuccess } from '../lib/telegram';
 import confetti from 'canvas-confetti';
 import { cn } from '../lib/utils';
+
+const motion = m as any;
 
 interface DashboardProps {
   lastUpdated?: number;
@@ -57,6 +60,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
+    
+    // Critical: Ensure user exists before fetching profile to avoid 404/null
+    await ensureUserExists();
+
     const [data, stats, profile] = await Promise.all([
       fetchHabitsWithCompletions(selectedDate),
       fetchWeeklyStats(),
