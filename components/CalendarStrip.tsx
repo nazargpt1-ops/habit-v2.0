@@ -1,7 +1,10 @@
+
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion as m } from 'framer-motion';
 import { getWeekDays, isSameDay, cn } from '../lib/utils';
 import { useLanguage } from '../context/LanguageContext';
+
+const motion = m as any;
 
 interface CalendarStripProps {
   selectedDate: Date;
