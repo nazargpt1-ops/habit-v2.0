@@ -1,11 +1,13 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { motion, useMotionValue, AnimatePresence } from 'framer-motion';
+import { motion as m, useMotionValue, AnimatePresence } from 'framer-motion';
 import { Check, Droplet, Book, Activity, Moon, Star, Zap, Flame, Bell } from 'lucide-react';
 import { HabitWithCompletion, Habit } from '../types';
 import { cn, hexToRgba } from '../lib/utils';
 import confetti from 'canvas-confetti';
 import { useLanguage } from '../context/LanguageContext';
+
+const motion = m as any;
 
 interface HabitCardProps {
   habit: HabitWithCompletion;
@@ -241,4 +243,3 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit, onToggle, onOpenDet
     </motion.div>
   );
 };
-
