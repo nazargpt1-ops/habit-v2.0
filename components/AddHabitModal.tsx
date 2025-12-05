@@ -1,11 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion as m, AnimatePresence } from 'framer-motion';
 import { X, Clock, Bell, Trash2 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { Priority, Translations, Habit } from '../types';
 import { cn } from '../lib/utils';
 import { hapticImpact } from '../lib/telegram';
+
+const motion = m as any;
 
 interface HabitModalProps {
   isOpen: boolean;
