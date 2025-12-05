@@ -1,9 +1,12 @@
+
 import React, { useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { motion as m } from 'framer-motion';
 import { Mic, Dumbbell, BookOpen, Droplet, Moon, Ban, Plus, X } from 'lucide-react';
 import { Priority, Translations } from '../types';
 import { hexToRgba, cn } from '../lib/utils';
 import { useLanguage } from '../context/LanguageContext';
+
+const motion = m as any;
 
 export interface PresetHabit {
   title: string;
