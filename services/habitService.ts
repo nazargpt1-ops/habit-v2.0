@@ -146,7 +146,7 @@ export const fetchUserProfile = async (): Promise<User | null> => {
       .from('users')
       .select('*')
       .eq('telegram_id', userId)
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
     return data;
@@ -167,7 +167,7 @@ const updateUserGamification = async (coinAmount: number, xpAmount: number): Pro
       .from('users')
       .select('total_coins, xp, level')
       .eq('telegram_id', userId)
-      .single();
+      .maybeSingle();
 
     if (!user) return { oldLevel: 1, newLevel: 1 };
 
