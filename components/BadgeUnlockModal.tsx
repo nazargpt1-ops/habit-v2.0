@@ -1,11 +1,13 @@
 
 import React, { useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion as m, AnimatePresence } from 'framer-motion';
 import { Trophy, Flame, Footprints, Sunrise } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import confetti from 'canvas-confetti';
 import { cn } from '../lib/utils';
 import { Translations } from '../types';
+
+const motion = m as any;
 
 interface BadgeUnlockModalProps {
   badgeId: string | null;
