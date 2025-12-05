@@ -1,9 +1,11 @@
 
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion as m } from 'framer-motion';
 import { Users, Share2, Zap } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { getCurrentUserId } from '../services/habitService';
+
+const motion = m as any;
 
 export const ReferralCard: React.FC = () => {
   const { t } = useLanguage();
