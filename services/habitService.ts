@@ -81,17 +81,20 @@ export const ensureUserExists = async (): Promise<boolean> => {
   if (!isSupabaseConfigured) return true;
 
   const userId = getCurrentUserId();
+  
   const tgWebApp = typeof window !== 'undefined' ? window.Telegram?.WebApp : undefined;
   const tgUser = tgWebApp?.initDataUnsafe?.user;
   
-  // 1. Try to get param from Telegram data
+  // 1. Пробуем взять из Телеграма (если открыли по прямой ссылке t.me/...)
   let startParam = tgWebApp?.initDataUnsafe?.start_param;
 
-  // 2. Fallback to URL parameters (passed by our Bot)
+  // 2. Если пусто — пробуем взять из URL (если открыли через кнопку в боте)
   if (!startParam && typeof window !== 'undefined') {
     const urlParams = new URLSearchParams(window.location.search);
     startParam = urlParams.get('start_param') || undefined;
   }
+  
+  console.log("DEBUG: Detected Start Param:", startParam);
 
   // Detect Timezone from browser
   let timezone = 'UTC';
