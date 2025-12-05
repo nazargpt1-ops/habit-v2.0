@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
-import { Habit, Completion, HabitWithCompletion, Priority, User, RPGStat } from '../types';
+import { Habit, Completion, HabitWithCompletion, Priority, User } from '../types';
 import { formatDateKey } from '../lib/utils';
 
 const TEST_USER_ID = 99999999;
@@ -7,8 +7,8 @@ let hasVerifiedUser = false;
 
 // --- HELPERS ---
 
-export const getCurrentUserId = (): number | string => {
-  let userId: number | string = TEST_USER_ID;
+export const getCurrentUserId = (): number => {
+  let userId: number = TEST_USER_ID;
   
   if (typeof window !== 'undefined' && window.Telegram?.WebApp?.initDataUnsafe?.user?.id) {
     userId = window.Telegram.WebApp.initDataUnsafe.user.id;
@@ -19,10 +19,12 @@ export const getCurrentUserId = (): number | string => {
 
 /**
  * Calculates the current global streak based on a list of date strings.
+ * Assumes dates are YYYY-MM-DD.
  */
 const calculateGlobalStreakFromDates = (dates: string[]): number => {
   if (!dates || dates.length === 0) return 0;
   
+  // Sort descending
   const uniqueDates = Array.from(new Set(dates)).sort((a, b) => b.localeCompare(a));
   
   const todayStr = formatDateKey(new Date());
@@ -30,6 +32,7 @@ const calculateGlobalStreakFromDates = (dates: string[]): number => {
   yesterday.setDate(yesterday.getDate() - 1);
   const yesterdayStr = formatDateKey(yesterday);
 
+  // Check if streak is alive (latest completion must be today or yesterday)
   if (uniqueDates[0] !== todayStr && uniqueDates[0] !== yesterdayStr) {
     return 0;
   }
@@ -37,6 +40,7 @@ const calculateGlobalStreakFromDates = (dates: string[]): number => {
   let streak = 0;
   let currentCheckDate = new Date();
   
+  // If latest is yesterday, start checking from yesterday
   if (uniqueDates[0] !== todayStr) {
      currentCheckDate.setDate(currentCheckDate.getDate() - 1);
   }
@@ -54,6 +58,9 @@ const calculateGlobalStreakFromDates = (dates: string[]): number => {
   return streak;
 };
 
+/**
+ * Calculates the current streak based on completion history for a single habit.
+ */
 const calculateStreak = (completions: Completion[]): number => {
   if (!completions || completions.length === 0) return 0;
   const dates = completions.map(c => c.date);
@@ -63,7 +70,7 @@ const calculateStreak = (completions: Completion[]): number => {
 // --- CORE SERVICE ---
 
 export const ensureUserExists = async (): Promise<boolean> => {
-  if (hasVerifiedUser) return true;
+  // If no Supabase config, assume success (Mock Mode)
   if (!isSupabaseConfigured || !supabase) return true;
 
   const userId = getCurrentUserId();
@@ -71,59 +78,70 @@ export const ensureUserExists = async (): Promise<boolean> => {
   const tgUser = tgWebApp?.initDataUnsafe?.user;
   const startParam = tgWebApp?.initDataUnsafe?.start_param;
 
-  let timezone = 'UTC';
-  try { timezone = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) {}
-
   try {
-    // 1. Проверяем существование (только по telegram_id)
-    const { data: existingUser, error: checkError } = await supabase
+    // 1. Check if user already exists (Select ONLY telegram_id)
+    const { data: existingUser, error: fetchError } = await supabase
       .from('users')
-      .select('telegram_id') 
+      .select('telegram_id')
       .eq('telegram_id', userId)
       .maybeSingle();
 
-    if (checkError) {
-      console.error("Error checking user existence:", checkError);
-      return false;
+    if (fetchError) {
+        console.error("Error checking user existence:", fetchError);
+        return false;
     }
 
-    // 2. Если пользователь есть - обновляем инфо
-    if (existingUser) {
-      console.log("User exists, updating metadata...");
-      await supabase.from('users').update({
-        username: tgUser?.username || `user_${userId}`,
-        first_name: tgUser?.first_name || 'Unknown',
-        last_name: tgUser?.last_name || '',
-        language_code: tgUser?.language_code || 'en',
-        timezone: timezone
-      }).eq('telegram_id', userId);
+    // Detect Timezone from browser
+    let timezone = 'UTC';
+    try {
+      timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch (e) {
+      console.warn("Timezone detection failed, defaulting to UTC");
+    }
 
+    if (existingUser) {
+      // 2. Existing User: Update metadata (username, etc.) but NOT referred_by
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({
+            username: tgUser?.username || `user_${userId}`,
+            first_name: tgUser?.first_name || 'Unknown',
+            last_name: tgUser?.last_name || '',
+            language_code: tgUser?.language_code || 'en',
+            timezone: timezone
+        })
+        .eq('telegram_id', userId);
+
+      if (updateError) console.error("Error updating user metadata:", updateError);
+      
       hasVerifiedUser = true;
       return true;
     }
 
-    // 3. Если пользователя НЕТ - создаем (с Рефералкой)
-    console.log("Creating NEW user with param:", startParam);
-    
+    // 3. New User (Referral Logic)
     let referredBy: number | null = null;
-    let initialXp = 0;
-    const initialLevel = 1;
+    let initialXp = 0; // Default start
 
     if (startParam && startParam.startsWith('ref_')) {
-       const refString = startParam.split('ref_')[1];
-       const referrerId = parseInt(refString, 10);
+       const referrerIdRaw = startParam.split('ref_')[1];
+       const referrerId = parseInt(referrerIdRaw, 10);
        
-       if (!isNaN(referrerId) && referrerId !== Number(userId)) {
-          // Проверяем, существует ли пригласивший
-          const { data: refCheck } = await supabase.from('users').select('telegram_id').eq('telegram_id', referrerId).maybeSingle();
-          if (refCheck) {
+       // Basic validation: Referrer exists, is valid number, and not self-referral
+       if (!isNaN(referrerId) && referrerId !== userId) {
+          const { data: referrer } = await supabase
+            .from('users')
+            .select('telegram_id')
+            .eq('telegram_id', referrerId)
+            .maybeSingle();
+            
+          if (referrer) {
              referredBy = referrerId;
-             initialXp = 50; // Бонус новичку
-             console.log("Valid referral from:", referredBy);
+             initialXp = 50; // Bonus for being referred
           }
        }
     }
 
+    // Prepare User Data (Explicitly include referred_by)
     const userData = {
       telegram_id: userId,
       username: tgUser?.username || `user_${userId}`,
@@ -131,39 +149,45 @@ export const ensureUserExists = async (): Promise<boolean> => {
       last_name: tgUser?.last_name || '',
       language_code: tgUser?.language_code || 'en',
       timezone: timezone,
-      referred_by: referredBy, 
-      xp: initialXp, 
-      level: initialLevel,
+      referred_by: referredBy,
+      xp: initialXp,
+      level: 1,
       total_coins: 0
     };
 
-    const { error: insertError } = await supabase.from('users').insert(userData);
+    const { error: insertError } = await supabase
+      .from('users')
+      .insert(userData);
 
     if (insertError) {
-       console.error("Insert user error:", insertError);
+       console.error("Error creating user:", insertError);
        return false;
     }
 
-    // 4. Награда пригласившему
+    // 4. Reward Referrer
     if (referredBy) {
-       console.log("Rewarding referrer:", referredBy);
-       const { data: referrer } = await supabase
-         .from('users')
-         .select('xp')
-         .eq('telegram_id', referredBy)
-         .single();
-
-       if (referrer) {
-         const newXp = (referrer.xp || 0) + 100;
-         const newLevel = Math.floor(newXp / 100) + 1;
-         await supabase.from('users').update({ xp: newXp, level: newLevel }).eq('telegram_id', referredBy);
-       }
+         const { data: referrerData } = await supabase
+           .from('users')
+           .select('xp, level')
+           .eq('telegram_id', referredBy)
+           .single();
+           
+         if (referrerData) {
+            // Reward Referrer (+100 XP)
+            const newRefXp = (referrerData.xp || 0) + 100;
+            const newRefLevel = Math.floor(newRefXp / 100) + 1;
+            
+            await supabase
+              .from('users')
+              .update({ xp: newRefXp, level: newRefLevel })
+              .eq('telegram_id', referredBy);
+         }
     }
 
     hasVerifiedUser = true;
     return true;
   } catch (err) {
-    console.error("Fatal ensureUserExists:", err);
+    console.error("ensureUserExists failed:", err);
     return false;
   }
 };
@@ -171,20 +195,35 @@ export const ensureUserExists = async (): Promise<boolean> => {
 export const fetchUserProfile = async (): Promise<User | null> => {
   if (!isSupabaseConfigured || !supabase) return null;
   const userId = getCurrentUserId();
+  
   try {
-    const { data, error } = await supabase.from('users').select('*').eq('telegram_id', userId).single();
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('telegram_id', userId)
+      .single();
+
     if (error) throw error;
     return data;
-  } catch (err) { return null; }
+  } catch (err) {
+    return null;
+  }
 };
 
-// Обновление геймификации (XP, Монеты, Уровень)
+/**
+ * Returns new level after update
+ */
 const updateUserGamification = async (coinAmount: number, xpAmount: number): Promise<{ oldLevel: number, newLevel: number }> => {
   if (!isSupabaseConfigured || !supabase) return { oldLevel: 1, newLevel: 1 };
   const userId = getCurrentUserId();
 
   try {
-    const { data: user } = await supabase.from('users').select('total_coins, xp, level').eq('telegram_id', userId).single();
+    const { data: user } = await supabase
+      .from('users')
+      .select('total_coins, xp, level')
+      .eq('telegram_id', userId)
+      .single();
+
     if (!user) return { oldLevel: 1, newLevel: 1 };
 
     const oldLevel = user.level || 1;
@@ -196,29 +235,53 @@ const updateUserGamification = async (coinAmount: number, xpAmount: number): Pro
 
     const newLevel = Math.floor(newXP / 100) + 1;
 
-    await supabase.from('users').update({ total_coins: newCoins, xp: newXP, level: newLevel }).eq('telegram_id', userId);
+    await supabase
+      .from('users')
+      .update({ 
+        total_coins: newCoins,
+        xp: newXP,
+        level: newLevel
+      })
+      .eq('telegram_id', userId);
+      
     return { oldLevel, newLevel };
   } catch (err) {
+    console.error("Failed to update gamification stats:", err);
     return { oldLevel: 1, newLevel: 1 };
   }
 };
 
 export const fetchHabitsWithCompletions = async (date: Date): Promise<HabitWithCompletion[]> => {
   if (!isSupabaseConfigured || !supabase) return [];
+  
   try {
     const userId = getCurrentUserId();
     await ensureUserExists();
+
     const dateKey = formatDateKey(date);
 
-    const { data: habits } = await supabase.from('habits').select('*').eq('user_id', userId).eq('is_archived', false).order('created_at', { ascending: true });
+    const { data: habits, error: habitsError } = await supabase
+      .from('habits')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_archived', false)
+      .order('created_at', { ascending: true });
+
+    if (habitsError) throw habitsError;
     if (!habits || habits.length === 0) return [];
 
     const habitIds = habits.map(h => h.id);
-    const { data: completions } = await supabase.from('completions').select('*').in('habit_id', habitIds);
+    const { data: completions, error: completionsError } = await supabase
+      .from('completions')
+      .select('*')
+      .in('habit_id', habitIds);
+
+    if (completionsError) throw completionsError;
 
     return habits.map((habit: Habit) => {
       const habitCompletions = completions?.filter(c => c.habit_id === habit.id) || [];
       const todayCompletion = habitCompletions.find(c => c.date === dateKey);
+      
       return {
         ...habit,
         completed: !!todayCompletion,
@@ -227,7 +290,16 @@ export const fetchHabitsWithCompletions = async (date: Date): Promise<HabitWithC
         currentStreak: calculateStreak(habitCompletions)
       };
     });
-  } catch (err) { return []; }
+
+  } catch (err) {
+    return [];
+  }
+};
+
+export const fetchHabitHistory = async (habitId: string): Promise<Completion[]> => {
+  if (!isSupabaseConfigured || !supabase) return [];
+  const { data } = await supabase.from('completions').select('*').eq('habit_id', habitId).order('date', { ascending: false });
+  return data || [];
 };
 
 export const createHabit = async (title: string, priority: Priority, color: string, category: string, reminderTime?: string, reminderDate?: string, reminderDays?: string[]): Promise<Habit | null> => {
@@ -267,17 +339,28 @@ export const deleteHabit = async (habitId: string): Promise<boolean> => {
   } catch (err) { return false; }
 };
 
-// Проверка ачивок
+/**
+ * Detects stats to see if a badge should be unlocked.
+ */
 const checkBadgeConditions = async (userId: string | number): Promise<{ count: number, streak: number }> => {
     if (!supabase) return { count: 0, streak: 0 };
-    const { data } = await supabase.from('completions').select('date').eq('user_id', userId);
+    
+    // Fetch all completions dates for user
+    const { data } = await supabase
+        .from('completions')
+        .select('date')
+        .eq('user_id', userId);
+        
     const dates = (data || []).map(d => d.date);
     const count = dates.length;
     const streak = calculateGlobalStreakFromDates(dates);
+    
     return { count, streak };
 };
 
-// Переключение выполнения привычки
+/**
+ * Toggles completion status and handles coin rewards AND badge detection.
+ */
 export const toggleHabitCompletion = async (
   habitId: string, 
   date: Date, 
@@ -297,27 +380,45 @@ export const toggleHabitCompletion = async (
     const xpReward = 10;
 
     if (isCompleted) {
+      // Collect potential badges triggered by this action
       const potentialBadges: string[] = [];
-      if (new Date().getHours() < 8) potentialBadges.push('early_bird');
 
+      // 1. Check Early Bird (Time based action)
+      if (new Date().getHours() < 8) {
+          potentialBadges.push('early_bird');
+      }
+
+      // 2. Perform Insert
       const { data: existing } = await supabase.from('completions').select('id').eq('habit_id', habitId).eq('date', dateKey).maybeSingle();
       if (existing) return { success: true, newId: existing.id, coinsEarned: 0 };
 
       const { data, error } = await supabase
         .from('completions')
-        .insert({ habit_id: habitId, user_id: userId, date: dateKey, note, completed_at: new Date().toISOString() })
+        .insert({ 
+            habit_id: habitId, user_id: userId, date: dateKey, note,
+            completed_at: new Date().toISOString()
+        })
         .select().single();
       
       if (error) throw error;
       const newId = data.id;
 
+      // 3. Update XP & Check Level Badge
       const { oldLevel, newLevel } = await updateUserGamification(reward, xpReward);
-      if (oldLevel < 5 && newLevel >= 5) potentialBadges.push('level_5');
+      if (oldLevel < 5 && newLevel >= 5) {
+          potentialBadges.push('level_5');
+      }
 
+      // 4. Check Stats Badges (Count & Streak)
       const { count, streak } = await checkBadgeConditions(userId);
+      
+      // "First Step": Total went from 0 to 1
       if (count === 1) potentialBadges.push('first_step');
+      
+      // "On Fire": Streak reached 7
       if (streak === 7) potentialBadges.push('week_streak');
 
+      // 5. Priority Selection
       if (potentialBadges.includes('level_5')) newBadge = 'level_5';
       else if (potentialBadges.includes('week_streak')) newBadge = 'week_streak';
       else if (potentialBadges.includes('first_step')) newBadge = 'first_step';
@@ -326,15 +427,20 @@ export const toggleHabitCompletion = async (
       return { success: true, newId, coinsEarned: reward, newBadge };
 
     } else {
+      // Undo completion
       if (!existingCompletionId) {
           await supabase.from('completions').delete().eq('habit_id', habitId).eq('date', dateKey);
       } else {
           await supabase.from('completions').delete().eq('id', existingCompletionId);
       }
+      
       await updateUserGamification(-reward, -xpReward);
       return { success: true, coinsEarned: -reward, newBadge: null };
     }
-  } catch (err) { return { success: false }; }
+  } catch (err) {
+    console.error("[HabitService] Error toggling completion:", err);
+    return { success: false };
+  }
 };
 
 export const updateCompletionNote = async (completionId: string, note: string) => {
@@ -352,9 +458,17 @@ export const fetchWeeklyStats = async (): Promise<{ day: string; count: number }
 
   try {
     await ensureUserExists();
-    const { data: completions } = await supabase.from('completions').select('date').eq('user_id', userId).gte('date', startDateStr);
+    const { data: completions } = await supabase
+      .from('completions')
+      .select('date')
+      .eq('user_id', userId)
+      .gte('date', startDateStr);
+
     const counts: Record<string, number> = {};
-    (completions || []).forEach(c => { counts[c.date] = (counts[c.date] || 0) + 1; });
+    (completions || []).forEach(c => {
+        counts[c.date] = (counts[c.date] || 0) + 1;
+    });
+
     const result = [];
     for(let i = 0; i < 7; i++) {
         const d = new Date(sevenDaysAgo);
@@ -367,21 +481,35 @@ export const fetchWeeklyStats = async (): Promise<{ day: string; count: number }
   } catch (err) { return []; }
 };
 
-export const fetchHeatmapData = async (): Promise<{ heatmap: any[], totalCompletions: number, currentStreak: number }> => {
+export interface HeatmapData {
+  date: string;
+  count: number;
+  level: number;
+}
+
+export const fetchHeatmapData = async (): Promise<{ heatmap: HeatmapData[], totalCompletions: number, currentStreak: number }> => {
   if (!isSupabaseConfigured || !supabase) return { heatmap: [], totalCompletions: 0, currentStreak: 0 };
+
   try {
       const userId = getCurrentUserId();
       await ensureUserExists();
-      const { data: completions } = await supabase.from('completions').select('date').eq('user_id', userId);
+
+      // Optimize: Fetch only dates
+      const { data: completions } = await supabase
+        .from('completions')
+        .select('date')
+        .eq('user_id', userId);
+      
       const safeCompletions = completions || [];
       const dates = safeCompletions.map(c => c.date);
       const counts: Record<string, number> = {};
       dates.forEach(d => { counts[d] = (counts[d] || 0) + 1; });
-      
-      const heatmap = [];
+
+      const heatmap: HeatmapData[] = [];
       const today = new Date();
       const startDate = new Date(today);
       startDate.setDate(startDate.getDate() - 364);
+
       for (let d = new Date(startDate); d <= today; d.setDate(d.getDate() + 1)) {
            const key = formatDateKey(d);
            const count = counts[key] || 0;
@@ -389,26 +517,65 @@ export const fetchHeatmapData = async (): Promise<{ heatmap: any[], totalComplet
            if (count === 0) level = 0; else if (count <= 1) level = 1; else if (count <= 2) level = 2; else if (count <= 3) level = 3; else level = 4;
            heatmap.push({ date: key, count, level });
       }
-      return { heatmap, totalCompletions: safeCompletions.length, currentStreak: calculateGlobalStreakFromDates(dates) };
-  } catch (err) { return { heatmap: [], totalCompletions: 0, currentStreak: 0 }; }
+
+      const currentStreak = calculateGlobalStreakFromDates(dates);
+
+      return { 
+          heatmap, 
+          totalCompletions: safeCompletions.length, 
+          currentStreak 
+      };
+
+  } catch (err) {
+      return { heatmap: [], totalCompletions: 0, currentStreak: 0 };
+  }
 };
 
+export interface RPGStat {
+  subject: string;
+  A: number;
+  fullMark: number;
+}
+
 export const fetchRPGStats = async (): Promise<RPGStat[]> => {
-  if (!isSupabaseConfigured || !supabase) return ['VIT', 'INT', 'DIS', 'CHA', 'WIS', 'STA'].map(s => ({ subject: s, A: 0, fullMark: 10 }));
+  if (!isSupabaseConfigured || !supabase) {
+    return ['VIT', 'INT', 'DIS', 'CHA', 'WIS', 'STA'].map(s => ({ subject: s, A: 0, fullMark: 10 }));
+  }
+
   const userId = getCurrentUserId();
-  const categoryMap: Record<string, string> = { 'health': 'VIT', 'mind': 'INT', 'mindfulness': 'INT', 'work': 'DIS', 'social': 'CHA', 'growth': 'WIS', 'energy': 'STA' };
-  const scores: Record<string, number> = { 'VIT': 0, 'INT': 0, 'DIS': 0, 'CHA': 0, 'WIS': 0, 'STA': 0 };
+  const categoryMap: Record<string, string> = {
+    'health': 'VIT',
+    'mind': 'INT',
+    'mindfulness': 'INT', 
+    'work': 'DIS',
+    'social': 'CHA',
+    'growth': 'WIS',
+    'energy': 'STA'
+  };
+
+  const scores: Record<string, number> = {
+    'VIT': 0, 'INT': 0, 'DIS': 0, 'CHA': 0, 'WIS': 0, 'STA': 0
+  };
 
   try {
-    const { data: completions } = await supabase.from('completions').select('habit_id, habit:habits(category)').eq('user_id', userId);
+    const { data: completions, error } = await supabase
+      .from('completions')
+      .select('habit_id, habit:habits(category)')
+      .eq('user_id', userId);
+
+    if (error) throw error;
+
     if (completions) {
       completions.forEach((item: any) => {
         const habitData = Array.isArray(item.habit) ? item.habit[0] : item.habit;
+        
         if (habitData && habitData.category) {
           const catLower = habitData.category.toLowerCase().trim();
           const statKey = categoryMap[catLower];
-          if (statKey && scores[statKey] !== undefined) scores[statKey] += 1; 
-          else {
+
+          if (statKey && scores[statKey] !== undefined) {
+             scores[statKey] += 1; 
+          } else {
              if (catLower.includes('health')) scores['VIT']++;
              else if (catLower.includes('mind')) scores['INT']++;
              else if (catLower.includes('work')) scores['DIS']++;
@@ -419,8 +586,19 @@ export const fetchRPGStats = async (): Promise<RPGStat[]> => {
         }
       });
     }
+
+    const order = ['VIT', 'INT', 'DIS', 'CHA', 'WIS', 'STA'];
     const maxVal = Math.max(...Object.values(scores), 0); 
-    const fullMark = Math.max(Math.ceil(maxVal * 1.2), 10); 
-    return ['VIT', 'INT', 'DIS', 'CHA', 'WIS', 'STA'].map(subject => ({ subject, A: scores[subject], fullMark }));
-  } catch (err) { return ['VIT', 'INT', 'DIS', 'CHA', 'WIS', 'STA'].map(s => ({ subject: s, A: 0, fullMark: 10 })); }
+    const fullMark = Math.max(Math.ceil(maxVal * 1.2), 10);
+
+    return order.map(subject => ({
+      subject,
+      A: scores[subject],
+      fullMark
+    }));
+
+  } catch (err) {
+    console.error("Fatal error in fetchRPGStats:", err);
+    return ['VIT', 'INT', 'DIS', 'CHA', 'WIS', 'STA'].map(s => ({ subject: s, A: 0, fullMark: 10 }));
+  }
 };
