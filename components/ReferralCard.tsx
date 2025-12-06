@@ -10,7 +10,7 @@ const motion = m as any;
 export const ReferralCard: React.FC = () => {
   const { t } = useLanguage();
   const userId = getCurrentUserId();
-  const botUsername = 'calendar_for_chenge_bot'; // Replace with actual bot username
+  const botUsername = 'calendar_for_chenge_bot'; 
 
   const handleInvite = () => {
     // 1. Haptic Feedback
@@ -19,8 +19,8 @@ export const ReferralCard: React.FC = () => {
     }
 
     // 2. Generate Referral Link
-    // Format: https://t.me/BOT_NAME/app?startapp=ref_USERID
-    const inviteLink = `https://t.me/${botUsername}/app?startapp=ref_${userId}`;
+    // Format: https://t.me/BOT_NAME/APP_NAME?startapp=USERID
+    const inviteLink = `https://t.me/${botUsername}/HabitFlow?startapp=${userId}`;
     const text = t.referral_share_text;
     
     // 3. Construct Telegram Share URL
