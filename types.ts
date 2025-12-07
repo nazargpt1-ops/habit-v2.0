@@ -17,6 +17,10 @@ export interface User {
   // Gamification
   xp?: number;
   level?: number;
+  // Referral
+  referred_by?: number;
+  // Notifications
+  notifications_enabled?: boolean;
 }
 
 export interface Habit {
@@ -212,6 +216,12 @@ export interface Translations {
 
   // Sharing
   share_message: string;
+  
+  // Referral
+  referral_title: string;
+  referral_desc: string;
+  referral_btn: string;
+  referral_share_text: string;
 
   // Quick Start Presets
   quick_start_title: string;
@@ -222,4 +232,9 @@ export interface Translations {
   preset_water: string;
   preset_meditation: string;
   preset_no_sugar: string;
+
+  // Bot Banner
+  bot_banner_text: string;
+  bot_banner_btn: string;
+  bot_required_alert: string;
 }
