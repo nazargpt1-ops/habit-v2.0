@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { motion as m, AnimatePresence } from 'framer-motion';
 import { X, Clock, Bell, Trash2 } from 'lucide-react';
@@ -7,6 +6,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { Priority, Translations, Habit } from '../types';
 import { cn } from '../lib/utils';
 import { hapticImpact, requestNotificationPermission } from '../lib/telegram';
+import { checkBotStarted, showBotBanner } from '../lib/botHelpers';
 
 const motion = m as any;
 
@@ -78,6 +78,35 @@ export const AddHabitModal: React.FC<HabitModalProps> = ({ isOpen, onClose, onSa
         undefined
     );
     onClose();
+  };
+
+  const handleReminderToggle = async () => {
+    const newValue = !reminderEnabled;
+    
+    if (newValue) {
+        // Check if bot is started before enabling
+        const isStarted = await checkBotStarted();
+        
+        if (!isStarted) {
+            // Show alert/notification inside TWA
+            if (window.Telegram?.WebApp?.showAlert) {
+                window.Telegram.WebApp.showAlert(t.bot_required_alert);
+            } else {
+                alert(t.bot_required_alert);
+            }
+            // Trigger the banner to show up so user can subscribe
+            showBotBanner();
+            return;
+        }
+
+        // If started, proceed with native permission request if needed
+        requestNotificationPermission((allowed) => {
+           if (allowed) console.log("🔔 Permission granted via toggle");
+        });
+    }
+
+    setReminderEnabled(newValue);
+    hapticImpact('light');
   };
 
   const isEditing = !!initialHabit;
@@ -212,17 +241,7 @@ export const AddHabitModal: React.FC<HabitModalProps> = ({ isOpen, onClose, onSa
                     
                     <button 
                         type="button"
-                        onClick={() => {
-                            const newValue = !reminderEnabled;
-                            setReminderEnabled(newValue);
-                            hapticImpact('light');
-                            
-                            if (newValue) {
-                              requestNotificationPermission((allowed) => {
-                                if (allowed) console.log("🔔 Permission granted via toggle");
-                              });
-                            }
-                        }}
+                        onClick={handleReminderToggle}
                         className={cn(
                             "w-12 h-7 rounded-full p-1 transition-colors duration-300 ease-in-out relative focus:outline-none",
                             reminderEnabled ? "bg-accent" : "bg-gray-300 dark:bg-slate-600"
