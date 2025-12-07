@@ -1,12 +1,14 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { motion as m, AnimatePresence } from 'framer-motion';
-import { X, Clock, Bell, Trash2 } from 'lucide-react';
+import { X, Clock, Bell, Trash2, Send, AlertTriangle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { Priority, Translations, Habit } from '../types';
 import { cn } from '../lib/utils';
-import { hapticImpact, requestNotificationPermission } from '../lib/telegram';
-import { checkBotStarted, showBotBanner } from '../lib/botHelpers';
+import { hapticImpact, hapticNotification, requestNotificationPermission } from '../lib/telegram';
+import { checkBotStarted } from '../lib/botHelpers';
+import { getCurrentUserId } from '../services/habitService';
 
 const motion = m as any;
 
@@ -36,6 +38,9 @@ export const AddHabitModal: React.FC<HabitModalProps> = ({ isOpen, onClose, onSa
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [reminderTime, setReminderTime] = useState('09:00');
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  
+  // State for inline bot alert
+  const [showBotAlert, setShowBotAlert] = useState(false);
 
   useEffect(() => {
     if (isOpen && initialHabit) {
@@ -53,6 +58,7 @@ export const AddHabitModal: React.FC<HabitModalProps> = ({ isOpen, onClose, onSa
         setReminderEnabled(false);
       }
       setIsConfirmingDelete(false);
+      setShowBotAlert(false);
     } else if (isOpen && !initialHabit) {
       setTitle('');
       setPriority('medium');
@@ -60,6 +66,7 @@ export const AddHabitModal: React.FC<HabitModalProps> = ({ isOpen, onClose, onSa
       setReminderEnabled(false);
       setReminderTime('09:00');
       setIsConfirmingDelete(false);
+      setShowBotAlert(false);
     }
   }, [isOpen, initialHabit]);
 
@@ -88,14 +95,9 @@ export const AddHabitModal: React.FC<HabitModalProps> = ({ isOpen, onClose, onSa
         const isStarted = await checkBotStarted();
         
         if (!isStarted) {
-            // Show alert/notification inside TWA
-            if (window.Telegram?.WebApp?.showAlert) {
-                window.Telegram.WebApp.showAlert(t.bot_required_alert);
-            } else {
-                alert(t.bot_required_alert);
-            }
-            // Trigger the banner to show up so user can subscribe
-            showBotBanner();
+            // Show INLINE alert instead of window.alert/banner
+            setShowBotAlert(true);
+            hapticNotification('error'); // Distinct feedback for error/warning
             return;
         }
 
@@ -106,7 +108,23 @@ export const AddHabitModal: React.FC<HabitModalProps> = ({ isOpen, onClose, onSa
     }
 
     setReminderEnabled(newValue);
+    setShowBotAlert(false);
     hapticImpact('light');
+  };
+
+  const handleOpenBot = () => {
+    const userId = getCurrentUserId();
+    // Hardcoded bot username from previous context
+    const botUsername = 'calendar_for_chenge_bot';
+    const url = `https://t.me/${botUsername}?start=user_${userId}`;
+
+    if (typeof window !== 'undefined' && window.Telegram?.WebApp?.openTelegramLink) {
+        window.Telegram.WebApp.openTelegramLink(url);
+    } else {
+        window.open(url, '_blank');
+    }
+    // We keep the alert open or we could close it. 
+    // Keeping it open reminds them they need to return and toggle it again.
   };
 
   const isEditing = !!initialHabit;
@@ -228,7 +246,7 @@ export const AddHabitModal: React.FC<HabitModalProps> = ({ isOpen, onClose, onSa
 
               {/* Smart Reminder Section */}
               <div className="space-y-3">
-                 <div className="flex items-center justify-between p-4 bg-surface dark:bg-slate-800/80 rounded-2xl">
+                 <div className="flex items-center justify-between p-4 bg-surface dark:bg-slate-800/80 rounded-2xl transition-colors">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-700 flex items-center justify-center text-accent shadow-sm">
                             <Bell size={20} fill={reminderEnabled ? "currentColor" : "none"} />
@@ -258,6 +276,44 @@ export const AddHabitModal: React.FC<HabitModalProps> = ({ isOpen, onClose, onSa
                     </button>
                  </div>
 
+                 {/* Bot Not Started Alert - INLINE */}
+                 <AnimatePresence>
+                    {showBotAlert && (
+                       <motion.div
+                          initial={{ height: 0, opacity: 0, scale: 0.95 }}
+                          animate={{ height: 'auto', opacity: 1, scale: 1 }}
+                          exit={{ height: 0, opacity: 0, scale: 0.95 }}
+                          className="overflow-hidden"
+                       >
+                          <div className="p-4 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-xl flex items-start gap-3 mt-2">
+                              <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm shrink-0">
+                                  <AlertTriangle size={20} className="text-white" />
+                              </div>
+                              <div className="flex-1">
+                                  <h4 className="font-bold text-sm mb-1">Bot Required</h4>
+                                  <p className="text-xs text-white/90 leading-relaxed mb-3">
+                                      {t.bot_required_alert}
+                                  </p>
+                                  <button 
+                                      onClick={handleOpenBot}
+                                      className="flex items-center gap-2 px-4 py-2 bg-white text-indigo-700 text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm active:scale-95 transition-transform"
+                                  >
+                                      <Send size={12} />
+                                      {t.bot_banner_btn}
+                                  </button>
+                              </div>
+                              <button 
+                                onClick={() => setShowBotAlert(false)}
+                                className="p-1 hover:bg-white/10 rounded-full transition-colors"
+                              >
+                                <X size={16} className="text-white/70" />
+                              </button>
+                          </div>
+                       </motion.div>
+                    )}
+                 </AnimatePresence>
+
+                 {/* Time Picker (Shows when enabled) */}
                  <AnimatePresence>
                     {reminderEnabled && (
                         <motion.div
@@ -266,7 +322,7 @@ export const AddHabitModal: React.FC<HabitModalProps> = ({ isOpen, onClose, onSa
                             exit={{ height: 0, opacity: 0 }}
                             className="overflow-hidden"
                         >
-                            <div className="flex items-center gap-3 p-4 bg-surface dark:bg-slate-800/80 rounded-2xl border border-gray-100 dark:border-white/5">
+                            <div className="flex items-center gap-3 p-4 bg-surface dark:bg-slate-800/80 rounded-2xl border border-gray-100 dark:border-white/5 mt-2">
                                 <Clock size={20} className="text-secondary" />
                                 <span className="text-sm font-semibold text-primary flex-1">
                                     {t.remind_at}
