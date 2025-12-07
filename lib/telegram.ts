@@ -90,7 +90,7 @@ export const initTelegramApp = () => {
   }
 };
 
-export const hapticImpact = (style: 'light' | 'medium' | 'heavy' = 'medium') => {
+export const hapticImpact = (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft' = 'medium') => {
   if (typeof window !== 'undefined' && window.Telegram?.WebApp?.HapticFeedback) {
     window.Telegram.WebApp.HapticFeedback.impactOccurred(style);
   }
@@ -99,6 +99,12 @@ export const hapticImpact = (style: 'light' | 'medium' | 'heavy' = 'medium') => 
 export const hapticSuccess = () => {
   if (typeof window !== 'undefined' && window.Telegram?.WebApp?.HapticFeedback) {
     window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+  }
+};
+
+export const hapticNotification = (type: 'error' | 'success' | 'warning') => {
+  if (typeof window !== 'undefined' && window.Telegram?.WebApp?.HapticFeedback) {
+    window.Telegram.WebApp.HapticFeedback.notificationOccurred(type);
   }
 };
 
