@@ -1,5 +1,4 @@
 
-
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion as m, AnimatePresence } from 'framer-motion';
 import { Calendar as CalendarIcon, Inbox, Sun, Moon, Zap } from 'lucide-react';
@@ -11,6 +10,7 @@ import { WeeklyChart } from '../components/WeeklyChart';
 import { HabitSuggestions, PresetHabit } from '../components/HabitSuggestions';
 import { AddHabitModal } from '../components/AddHabitModal';
 import { BadgeUnlockModal } from '../components/BadgeUnlockModal';
+import { BotSubscriptionBanner } from '../components/BotSubscriptionBanner';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { 
@@ -519,6 +519,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
         badgeId={unlockedBadge} 
         onClose={() => setUnlockedBadge(null)} 
       />
+
+      {/* Bot Subscription Banner */}
+      <BotSubscriptionBanner />
     </div>
   );
 };
