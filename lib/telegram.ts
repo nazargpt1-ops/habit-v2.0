@@ -108,25 +108,29 @@ export const hapticSelection = () => {
   }
 };
 
+export const isNotificationSupported = () => {
+  if (typeof window === 'undefined' || !window.Telegram?.WebApp) return false;
+  
+  // requestWriteAccess is available from version 6.9
+  // We explicitly check version string to avoid accessing the property which might trigger error on old clients
+  return window.Telegram.WebApp.isVersionAtLeast('6.9');
+};
+
 export const requestNotificationPermission = (callback?: (allowed: boolean) => void) => {
-  if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
-    // requestWriteAccess is only supported in version 6.9 and above
-    // Calling it on older versions (like 6.0) causes a "Method not supported" warning/error
-    if (window.Telegram.WebApp.isVersionAtLeast('6.9')) {
-      try {
-        window.Telegram.WebApp.requestWriteAccess((allowed) => {
-          if (callback) callback(allowed);
-        });
-      } catch (e) {
-        console.error("Error requesting write access:", e);
-        if (callback) callback(false);
-      }
-    } else {
-      console.warn(`Telegram WebApp requestWriteAccess not supported in this version (${window.Telegram.WebApp.version} < 6.9)`);
+  if (isNotificationSupported()) {
+    try {
+      window.Telegram.WebApp.requestWriteAccess((allowed) => {
+        if (callback) callback(allowed);
+      });
+    } catch (e) {
+      console.error("Error requesting write access:", e);
       if (callback) callback(false);
     }
   } else {
-    console.warn("Telegram WebApp not available");
+    // Only log if we are in an environment that has Telegram but version is old
+    if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
+       console.warn(`requestWriteAccess not supported (Version: ${window.Telegram.WebApp.version})`);
+    }
     if (callback) callback(false);
   }
 };
