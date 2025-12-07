@@ -35,6 +35,7 @@ declare global {
         openTelegramLink: (url: string) => void;
         setHeaderColor: (color: string) => void;
         setBackgroundColor: (color: string) => void;
+        requestWriteAccess: (callback?: (allowed: boolean) => void) => void;
         MainButton: {
           text: string;
           color: string;
@@ -104,5 +105,28 @@ export const hapticSuccess = () => {
 export const hapticSelection = () => {
   if (typeof window !== 'undefined' && window.Telegram?.WebApp?.HapticFeedback) {
     window.Telegram.WebApp.HapticFeedback.selectionChanged();
+  }
+};
+
+export const requestNotificationPermission = (callback?: (allowed: boolean) => void) => {
+  if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
+    // requestWriteAccess is only supported in version 6.9 and above
+    // Calling it on older versions (like 6.0) causes a "Method not supported" warning/error
+    if (window.Telegram.WebApp.isVersionAtLeast('6.9')) {
+      try {
+        window.Telegram.WebApp.requestWriteAccess((allowed) => {
+          if (callback) callback(allowed);
+        });
+      } catch (e) {
+        console.error("Error requesting write access:", e);
+        if (callback) callback(false);
+      }
+    } else {
+      console.warn(`Telegram WebApp requestWriteAccess not supported in this version (${window.Telegram.WebApp.version} < 6.9)`);
+      if (callback) callback(false);
+    }
+  } else {
+    console.warn("Telegram WebApp not available");
+    if (callback) callback(false);
   }
 };
