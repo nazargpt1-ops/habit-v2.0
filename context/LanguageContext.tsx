@@ -157,7 +157,12 @@ const dictionaries: Record<Language, Translations> = {
     preset_read: "Read 10 pages",
     preset_water: "Drink Water",
     preset_meditation: "Meditation",
-    preset_no_sugar: "No Sugar"
+    preset_no_sugar: "No Sugar",
+
+    // Bot Banner
+    bot_banner_text: "🔔 Subscribe to our bot to receive daily task notifications.",
+    bot_banner_btn: "Open Bot",
+    bot_required_alert: "⚠️ To receive reminders, you need to start the bot first."
   },
   ru: {
     greeting: "Привет",
@@ -313,7 +318,12 @@ const dictionaries: Record<Language, Translations> = {
     preset_read: "Чтение 10 страниц",
     preset_water: "Пить воду",
     preset_meditation: "Медитация",
-    preset_no_sugar: "Без сахара"
+    preset_no_sugar: "Без сахара",
+
+    // Bot Banner
+    bot_banner_text: "🔔 Подпишись на наш телеграм бот, чтобы быть в курсе событий и получать уведомления о задачах",
+    bot_banner_btn: "Открыть бота",
+    bot_required_alert: "⚠️ Для получения напоминаний нужно запустить бота."
   }
 };
 
