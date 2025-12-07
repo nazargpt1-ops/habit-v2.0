@@ -25,7 +25,7 @@ import {
   getCurrentUserId
 } from '../services/habitService';
 import { HabitWithCompletion, Habit, Priority, User } from '../types';
-import { hapticImpact, hapticSuccess, requestNotificationPermission } from '../lib/telegram';
+import { hapticImpact, hapticSuccess, requestNotificationPermission, isNotificationSupported } from '../lib/telegram';
 import confetti from 'canvas-confetti';
 import { cn } from '../lib/utils';
 
@@ -59,9 +59,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
 
   // Badge Modal State
   const [unlockedBadge, setUnlockedBadge] = useState<string | null>(null);
-  
-  // Notification Permission State
-  const [notificationPermissionAsked, setNotificationPermissionAsked] = useState(false);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -83,32 +80,37 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
 
   useEffect(() => {
     loadData();
-    
-    // Check permission after delay
-    const checkPermission = () => {
+  }, [loadData, lastUpdated]);
+
+  // Separate effect for notification permission
+  useEffect(() => {
+    const askForPermission = () => {
+      // 1. Strict check: If API not supported, do nothing
+      if (!isNotificationSupported()) {
+        console.log("🔔 Notifications not supported in this Telegram version.");
+        return;
+      }
+
+      // 2. Check if already asked
       const userId = getCurrentUserId();
       const key = `notification_permission_asked_${userId}`;
       const hasAsked = localStorage.getItem(key);
 
       if (!hasAsked) {
-        const timer = setTimeout(() => {
-          requestNotificationPermission((allowed) => {
-            console.log("🔔 Permission result:", allowed);
-            localStorage.setItem(key, 'true');
-            setNotificationPermissionAsked(true);
-            if (allowed) {
-              hapticSuccess();
-            }
-          });
-        }, 3000);
-        return () => clearTimeout(timer);
-      } else {
-        setNotificationPermissionAsked(true);
+        requestNotificationPermission((allowed) => {
+          console.log("🔔 Permission request result:", allowed);
+          localStorage.setItem(key, 'true');
+          if (allowed) {
+            hapticSuccess();
+          }
+        });
       }
     };
 
-    checkPermission();
-  }, [loadData, lastUpdated]);
+    // Delay slightly to ensure app is ready
+    const timer = setTimeout(askForPermission, 3000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const sortedHabits = useMemo(() => {
     const priorityWeight = { high: 3, medium: 2, low: 1 };
