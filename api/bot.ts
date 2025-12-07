@@ -1,3 +1,4 @@
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 
@@ -63,6 +64,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const user = update.message.from;
       const firstName = user?.first_name || 'Friend';
       
+      // Update notifications_enabled when user starts the bot
+      await supabase.from('users').update({ notifications_enabled: true }).eq('telegram_id', chatId);
+
       const lang = getLanguage(user?.language_code);
       const t = TRANSLATIONS[lang as keyof typeof TRANSLATIONS];
 
