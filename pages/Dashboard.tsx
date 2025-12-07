@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion as m, AnimatePresence } from 'framer-motion';
 import { Calendar as CalendarIcon, Inbox, Sun, Moon, Zap } from 'lucide-react';
@@ -20,10 +21,11 @@ import {
   createHabit, 
   deleteHabit,
   fetchUserProfile,
-  ensureUserExists
+  ensureUserExists,
+  getCurrentUserId
 } from '../services/habitService';
 import { HabitWithCompletion, Habit, Priority, User } from '../types';
-import { hapticImpact, hapticSuccess } from '../lib/telegram';
+import { hapticImpact, hapticSuccess, requestNotificationPermission } from '../lib/telegram';
 import confetti from 'canvas-confetti';
 import { cn } from '../lib/utils';
 
@@ -57,6 +59,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
 
   // Badge Modal State
   const [unlockedBadge, setUnlockedBadge] = useState<string | null>(null);
+  
+  // Notification Permission State
+  const [notificationPermissionAsked, setNotificationPermissionAsked] = useState(false);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -78,6 +83,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
 
   useEffect(() => {
     loadData();
+    
+    // Check permission after delay
+    const checkPermission = () => {
+      const userId = getCurrentUserId();
+      const key = `notification_permission_asked_${userId}`;
+      const hasAsked = localStorage.getItem(key);
+
+      if (!hasAsked) {
+        const timer = setTimeout(() => {
+          requestNotificationPermission((allowed) => {
+            console.log("🔔 Permission result:", allowed);
+            localStorage.setItem(key, 'true');
+            setNotificationPermissionAsked(true);
+            if (allowed) {
+              hapticSuccess();
+            }
+          });
+        }, 3000);
+        return () => clearTimeout(timer);
+      } else {
+        setNotificationPermissionAsked(true);
+      }
+    };
+
+    checkPermission();
   }, [loadData, lastUpdated]);
 
   const sortedHabits = useMemo(() => {
