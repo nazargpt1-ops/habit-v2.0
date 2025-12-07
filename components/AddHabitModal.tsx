@@ -1,11 +1,12 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { motion as m, AnimatePresence } from 'framer-motion';
 import { X, Clock, Bell, Trash2 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { Priority, Translations, Habit } from '../types';
 import { cn } from '../lib/utils';
-import { hapticImpact } from '../lib/telegram';
+import { hapticImpact, requestNotificationPermission } from '../lib/telegram';
 
 const motion = m as any;
 
@@ -212,8 +213,15 @@ export const AddHabitModal: React.FC<HabitModalProps> = ({ isOpen, onClose, onSa
                     <button 
                         type="button"
                         onClick={() => {
-                            setReminderEnabled(!reminderEnabled);
+                            const newValue = !reminderEnabled;
+                            setReminderEnabled(newValue);
                             hapticImpact('light');
+                            
+                            if (newValue) {
+                              requestNotificationPermission((allowed) => {
+                                if (allowed) console.log("🔔 Permission granted via toggle");
+                              });
+                            }
                         }}
                         className={cn(
                             "w-12 h-7 rounded-full p-1 transition-colors duration-300 ease-in-out relative focus:outline-none",
