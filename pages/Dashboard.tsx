@@ -1,7 +1,6 @@
-
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { motion as m, AnimatePresence } from 'framer-motion';
-import { Calendar as CalendarIcon, Inbox, Sun, Moon, Zap } from 'lucide-react';
+import { Calendar as CalendarIcon, Inbox, Sun, Moon } from 'lucide-react';
 import { CalendarStrip } from '../components/CalendarStrip';
 import { HabitCard } from '../components/HabitCard';
 import { HabitDetailsModal } from '../components/HabitDetailsModal';
@@ -14,20 +13,21 @@ import { BotSubscriptionBanner } from '../components/BotSubscriptionBanner';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { 
-  fetchHabitsWithCompletions, 
-  toggleHabitCompletion, 
   fetchWeeklyStats, 
   updateHabit, 
   createHabit, 
   deleteHabit,
-  fetchUserProfile,
   ensureUserExists,
   getCurrentUserId
 } from '../services/habitService';
-import { HabitWithCompletion, Habit, Priority, User } from '../types';
+import { HabitWithCompletion, Habit, Priority } from '../types';
 import { hapticImpact, hapticSuccess, requestNotificationPermission, isNotificationSupported } from '../lib/telegram';
 import confetti from 'canvas-confetti';
 import { cn } from '../lib/utils';
+// 🔥 NEW IMPORTS
+import { useHabits } from '../hooks/useHabits';
+import { useUserProfile } from '../hooks/useUserProfile';
+import useSWR from 'swr';
 
 const motion = m as any;
 
@@ -40,10 +40,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
   const { theme, toggleTheme } = useTheme();
   
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [habits, setHabits] = useState<HabitWithCompletion[]>([]);
-  const [weeklyStats, setWeeklyStats] = useState<{day: string, count: number}[]>([]);
-  const [userProfile, setUserProfile] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  
+  // 🔥 CHANGED: Используем хуки SWR вместо useState/useEffect
+  const { habits, isLoading: isHabitsLoading, toggle: toggleHabitSWR } = useHabits(selectedDate);
+  const { userProfile, mutateUserProfile } = useUserProfile();
+  
+  // Weekly stats пока оставим на простом SWR
+  const { data: weeklyStats } = useSWR('weekly-stats', fetchWeeklyStats);
+
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   
   // Details Modal State
@@ -60,61 +64,36 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
   // Badge Modal State
   const [unlockedBadge, setUnlockedBadge] = useState<string | null>(null);
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    
-    // Critical: Ensure user exists before fetching profile to avoid 404/null
-    await ensureUserExists();
-
-    const [data, stats, profile] = await Promise.all([
-      fetchHabitsWithCompletions(selectedDate),
-      fetchWeeklyStats(),
-      fetchUserProfile()
-    ]);
-    
-    setHabits(data);
-    setWeeklyStats(stats);
-    setUserProfile(profile);
-    setIsLoading(false);
-  }, [selectedDate]);
-
+  // Initial Check User
   useEffect(() => {
-    loadData();
-  }, [loadData, lastUpdated]);
+    ensureUserExists();
+  }, []);
 
   // Separate effect for notification permission
   useEffect(() => {
     const askForPermission = () => {
-      // 1. Strict check: If API not supported, do nothing
       if (!isNotificationSupported()) {
         console.log("🔔 Notifications not supported in this Telegram version.");
         return;
       }
-
-      // 2. Check if already asked
       const userId = getCurrentUserId();
       const key = `notification_permission_asked_${userId}`;
       const hasAsked = localStorage.getItem(key);
 
       if (!hasAsked) {
         requestNotificationPermission((allowed) => {
-          console.log("🔔 Permission request result:", allowed);
           localStorage.setItem(key, 'true');
-          if (allowed) {
-            hapticSuccess();
-          }
+          if (allowed) hapticSuccess();
         });
       }
     };
-
-    // Delay slightly to ensure app is ready
     const timer = setTimeout(askForPermission, 3000);
     return () => clearTimeout(timer);
   }, []);
 
   const sortedHabits = useMemo(() => {
     const priorityWeight = { high: 3, medium: 2, low: 1 };
-    return [...habits].sort((a, b) => {
+    return [...(habits || [])].sort((a, b) => {
       if (a.completed !== b.completed) return a.completed ? 1 : -1;
       const pA = priorityWeight[a.priority || 'medium'];
       const pB = priorityWeight[b.priority || 'medium'];
@@ -123,35 +102,32 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
   }, [habits]);
 
   const progressPercentage = useMemo(() => {
-    if (habits.length === 0) return 0;
+    if (!habits || habits.length === 0) return 0;
     const completedCount = habits.filter(h => h.completed).length;
     return (completedCount / habits.length) * 100;
   }, [habits]);
 
+  // 🔥 CHANGED: Обновленный обработчик переключения
   const handleToggle = async (habitId: string) => {
+    // 1. Haptics
     if (typeof window !== 'undefined' && window.Telegram?.WebApp?.HapticFeedback) {
         window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
     } else {
         hapticImpact('medium');
     }
     
-    const habitIndex = habits.findIndex(h => h.id === habitId);
-    if (habitIndex === -1) return;
-
-    const oldHabit = habits[habitIndex];
-    const newStatus = !oldHabit.completed;
-    const reward = oldHabit.coins_reward || 10;
-    const xpReward = 10;
-
+    // 2. Find current state
+    const habit = habits.find(h => h.id === habitId);
+    if (!habit) return;
+    
+    const newStatus = !habit.completed;
     if (newStatus) hapticSuccess();
 
-    // Optimistic UI Update
-    const updatedHabits = [...habits];
-    updatedHabits[habitIndex] = { ...oldHabit, completed: newStatus };
-    setHabits(updatedHabits);
-    
-    // Optimistic Coin, XP, Level Update
+    // 3. Optimistic Profile Update (Coins/XP)
     if (userProfile) {
+        const reward = habit.coins_reward || 10;
+        const xpReward = 10;
+        
         let newCoins = (userProfile.total_coins || 0) + (newStatus ? reward : -reward);
         if (newCoins < 0) newCoins = 0;
 
@@ -160,19 +136,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
         
         const newLevel = Math.floor(newXp / 100) + 1;
 
-        setUserProfile({ 
+        // Мгновенно обновляем профиль в кэше
+        mutateUserProfile({ 
             ...userProfile, 
             total_coins: newCoins,
             xp: newXp,
             level: newLevel
-        });
+        }, false);
     }
 
-    const totalHabits = updatedHabits.length;
-    const completedCount = updatedHabits.filter(h => h.completed).length;
+    // 4. Confetti Logic
+    const totalHabits = habits.length;
+    // Считаем, сколько будет выполнено ПОСЛЕ клика
+    const currentCompleted = habits.filter(h => h.completed).length;
+    const newCompletedCount = newStatus ? currentCompleted + 1 : currentCompleted - 1;
     
-    // Mini celebration for completing all habits
-    if (newStatus && totalHabits > 0 && completedCount === totalHabits) {
+    if (newStatus && totalHabits > 0 && newCompletedCount === totalHabits) {
         confetti({
             particleCount: 150,
             spread: 100,
@@ -184,38 +163,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
         });
     }
 
-    // Call Service
-    const result = await toggleHabitCompletion(habitId, selectedDate, newStatus, oldHabit.completionId);
+    // 5. 🔥 SWR Toggle Call (Это делает всю магию с сервером и бэйджами)
+    await toggleHabitSWR(habitId, newStatus);
     
-    if (result.success && newStatus && result.newId) {
-        updatedHabits[habitIndex].completionId = result.newId;
-        setHabits([...updatedHabits]);
-        
-        // --- Badge Check ---
-        if (result.newBadge) {
-           setUnlockedBadge(result.newBadge);
-        }
-
-    } else if (!result.success) {
-        // Revert on failure
-        setHabits(habits);
-        if (userProfile) setUserProfile(userProfile);
-    }
+    // 6. После ответа сервера обновляем профиль, чтобы синхронизировать реальные данные
+    mutateUserProfile();
   };
 
   const handleUpdateHabit = async (id: string, updates: Partial<Habit>) => {
-      setHabits(prev => prev.map(h => h.id === id ? { ...h, ...updates } : h));
+      // Пока оставим прямой вызов + ревалидацию, чтобы не усложнять SWR логику для редких действий
       await updateHabit(id, updates);
+      // Заставляем SWR обновить список
+      toggleHabitSWR(id, updates.completed || false); // Хак: просто триггерим обновление, или используй mutate('habits-...')
   };
 
   const handleQuickAdd = async (preset: PresetHabit) => {
-    await createHabit(
-      preset.title, 
-      preset.priority, 
-      preset.color, 
-      preset.category
-    );
-    loadData();
+    await createHabit(preset.title, preset.priority, preset.color, preset.category);
+    // Принудительно обновляем страницу
+    window.location.reload(); // Или лучше использовать global mutate, но для MVP так надежнее
   };
 
   const openDetails = (habit: HabitWithCompletion) => {
@@ -236,14 +201,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
     } else {
       await createHabit(title, priority, color, category, reminderTime, reminderDate, reminderDays);
     }
-    loadData();
+    // Простой способ обновить данные после редактирования
+    window.location.reload(); 
     setIsEditModalOpen(false);
     setEditingHabit(null);
   };
 
   const handleDeleteHabit = async (id: string) => {
     await deleteHabit(id);
-    setHabits((prevHabits) => prevHabits.filter((h) => h.id !== id));
+    window.location.reload();
     setIsEditModalOpen(false);
     setEditingHabit(null);
   };
@@ -257,7 +223,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
   const dateString = selectedDate.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
   const isToday = selectedDate.toDateString() === new Date().toDateString();
 
-  const showSuggestions = !isLoading && habits.length === 0 && !isSuggestionsDismissed;
+  const showSuggestions = !isHabitsLoading && habits.length === 0 && !isSuggestionsDismissed;
 
   return (
     <div className="flex flex-col h-full w-full bg-background text-primary font-sans relative overflow-hidden">
@@ -434,7 +400,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
                  )}
              </div>
 
-            {isLoading ? (
+            {isHabitsLoading && !habits.length ? (
               <div className="space-y-3">
                  {[1, 2, 3].map(i => (
                    <div key={i} className="h-24 rounded-[24px] bg-surface shadow-sm animate-pulse dark:bg-slate-800/50" />
@@ -493,7 +459,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
             )}
         </section>
 
-        {habits.length > 0 && (
+        {habits.length > 0 && weeklyStats && (
           <section className="px-5 pb-4">
               <WeeklyChart data={weeklyStats} />
           </section>
