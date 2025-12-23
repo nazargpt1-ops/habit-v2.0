@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, PropsWithChildren } from 'react';
 import { Translations, Language } from '../types';
 
