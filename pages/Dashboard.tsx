@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion as m, AnimatePresence } from 'framer-motion';
 import { Calendar as CalendarIcon, Inbox, Sun, Moon, Zap, RefreshCw } from 'lucide-react';
@@ -89,10 +88,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
 
   useEffect(() => {
       refreshHabits();
-  }, [lastUpdated]);
+  }, [lastUpdated, refreshHabits]);
 
   const sortedHabits = useMemo(() => {
-    const priorityWeight = { high: 3, medium: 2, low: 1 };
+    const priorityWeight: Record<Priority, number> = { high: 3, medium: 2, low: 1 };
     return [...habits].sort((a, b) => {
       if (a.completed !== b.completed) return a.completed ? 1 : -1;
       const pA = priorityWeight[a.priority || 'medium'];
@@ -110,7 +109,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
   const handleManualRefresh = async () => {
     hapticImpact('light');
     setIsRefreshing(true);
-    clearCache(); // Clear custom cache if any
+    clearCache(); // Clear custom cache
     await refreshHabits();
     setTimeout(() => setIsRefreshing(false), 800);
   };
