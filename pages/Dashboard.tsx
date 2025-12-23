@@ -1,7 +1,7 @@
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { motion as m, AnimatePresence } from 'framer-motion';
-import { Calendar as CalendarIcon, Inbox, Sun, Moon, Zap } from 'lucide-react';
+import { Calendar as CalendarIcon, Inbox, Sun, Moon, Zap, RefreshCw } from 'lucide-react';
 import { CalendarStrip } from '../components/CalendarStrip';
 import { HabitCard } from '../components/HabitCard';
 import { HabitDetailsModal } from '../components/HabitDetailsModal';
@@ -14,20 +14,19 @@ import { BotSubscriptionBanner } from '../components/BotSubscriptionBanner';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { 
-  fetchHabitsWithCompletions, 
-  toggleHabitCompletion, 
-  fetchWeeklyStats, 
   updateHabit, 
   createHabit, 
   deleteHabit,
-  fetchUserProfile,
   ensureUserExists,
   getCurrentUserId
 } from '../services/habitService';
-import { HabitWithCompletion, Habit, Priority, User } from '../types';
+import { HabitWithCompletion, Habit, Priority } from '../types';
 import { hapticImpact, hapticSuccess, requestNotificationPermission, isNotificationSupported } from '../lib/telegram';
+import { clearCache } from '../lib/cache';
 import confetti from 'canvas-confetti';
 import { cn } from '../lib/utils';
+// Hook Imports
+import { useHabits, useUser, useWeeklyStats } from '../hooks/useHabits';
 
 const motion = m as any;
 
@@ -40,12 +39,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
   const { theme, toggleTheme } = useTheme();
   
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [habits, setHabits] = useState<HabitWithCompletion[]>([]);
-  const [weeklyStats, setWeeklyStats] = useState<{day: string, count: number}[]>([]);
-  const [userProfile, setUserProfile] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
+  // SWR Hooks
+  const { habits, isLoading: habitsLoading, toggleHabit, refreshHabits } = useHabits(selectedDate);
+  const { user: userProfile, isLoading: userLoading } = useUser();
+  const { stats: weeklyStats } = useWeeklyStats();
+  
+  const isLoading = habitsLoading && !habits.length;
+
   // Details Modal State
   const [selectedHabitDetails, setSelectedHabitDetails] = useState<HabitWithCompletion | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -60,57 +63,33 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
   // Badge Modal State
   const [unlockedBadge, setUnlockedBadge] = useState<string | null>(null);
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    
-    // Critical: Ensure user exists before fetching profile to avoid 404/null
-    await ensureUserExists();
-
-    const [data, stats, profile] = await Promise.all([
-      fetchHabitsWithCompletions(selectedDate),
-      fetchWeeklyStats(),
-      fetchUserProfile()
-    ]);
-    
-    setHabits(data);
-    setWeeklyStats(stats);
-    setUserProfile(profile);
-    setIsLoading(false);
-  }, [selectedDate]);
-
   useEffect(() => {
-    loadData();
-  }, [loadData, lastUpdated]);
+    ensureUserExists();
+  }, []);
 
-  // Separate effect for notification permission
   useEffect(() => {
     const askForPermission = () => {
-      // 1. Strict check: If API not supported, do nothing
-      if (!isNotificationSupported()) {
-        console.log("🔔 Notifications not supported in this Telegram version.");
-        return;
-      }
+      if (!isNotificationSupported()) return;
 
-      // 2. Check if already asked
       const userId = getCurrentUserId();
       const key = `notification_permission_asked_${userId}`;
       const hasAsked = localStorage.getItem(key);
 
       if (!hasAsked) {
         requestNotificationPermission((allowed) => {
-          console.log("🔔 Permission request result:", allowed);
           localStorage.setItem(key, 'true');
-          if (allowed) {
-            hapticSuccess();
-          }
+          if (allowed) hapticSuccess();
         });
       }
     };
 
-    // Delay slightly to ensure app is ready
     const timer = setTimeout(askForPermission, 3000);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+      refreshHabits();
+  }, [lastUpdated]);
 
   const sortedHabits = useMemo(() => {
     const priorityWeight = { high: 3, medium: 2, low: 1 };
@@ -128,51 +107,26 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
     return (completedCount / habits.length) * 100;
   }, [habits]);
 
+  const handleManualRefresh = async () => {
+    hapticImpact('light');
+    setIsRefreshing(true);
+    clearCache(); // Clear custom cache if any
+    await refreshHabits();
+    setTimeout(() => setIsRefreshing(false), 800);
+  };
+
   const handleToggle = async (habitId: string) => {
-    if (typeof window !== 'undefined' && window.Telegram?.WebApp?.HapticFeedback) {
-        window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
-    } else {
-        hapticImpact('medium');
-    }
+    hapticImpact('medium');
+    const habit = habits.find(h => h.id === habitId);
+    if (!habit) return;
+
+    const willComplete = !habit.completed;
+    if (willComplete) hapticSuccess();
+
+    const currentCompletedCount = habits.filter(h => h.completed).length;
+    const totalHabits = habits.length;
     
-    const habitIndex = habits.findIndex(h => h.id === habitId);
-    if (habitIndex === -1) return;
-
-    const oldHabit = habits[habitIndex];
-    const newStatus = !oldHabit.completed;
-    const reward = oldHabit.coins_reward || 10;
-    const xpReward = 10;
-
-    if (newStatus) hapticSuccess();
-
-    // Optimistic UI Update
-    const updatedHabits = [...habits];
-    updatedHabits[habitIndex] = { ...oldHabit, completed: newStatus };
-    setHabits(updatedHabits);
-    
-    // Optimistic Coin, XP, Level Update
-    if (userProfile) {
-        let newCoins = (userProfile.total_coins || 0) + (newStatus ? reward : -reward);
-        if (newCoins < 0) newCoins = 0;
-
-        let newXp = (userProfile.xp || 0) + (newStatus ? xpReward : -xpReward);
-        if (newXp < 0) newXp = 0;
-        
-        const newLevel = Math.floor(newXp / 100) + 1;
-
-        setUserProfile({ 
-            ...userProfile, 
-            total_coins: newCoins,
-            xp: newXp,
-            level: newLevel
-        });
-    }
-
-    const totalHabits = updatedHabits.length;
-    const completedCount = updatedHabits.filter(h => h.completed).length;
-    
-    // Mini celebration for completing all habits
-    if (newStatus && totalHabits > 0 && completedCount === totalHabits) {
+    if (willComplete && (currentCompletedCount + 1) === totalHabits && totalHabits > 0) {
         confetti({
             particleCount: 150,
             spread: 100,
@@ -184,38 +138,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
         });
     }
 
-    // Call Service
-    const result = await toggleHabitCompletion(habitId, selectedDate, newStatus, oldHabit.completionId);
-    
-    if (result.success && newStatus && result.newId) {
-        updatedHabits[habitIndex].completionId = result.newId;
-        setHabits([...updatedHabits]);
-        
-        // --- Badge Check ---
-        if (result.newBadge) {
-           setUnlockedBadge(result.newBadge);
-        }
-
-    } else if (!result.success) {
-        // Revert on failure
-        setHabits(habits);
-        if (userProfile) setUserProfile(userProfile);
+    const result = await toggleHabit(habitId);
+    if (result && result.success && result.newBadge) {
+        setUnlockedBadge(result.newBadge);
     }
   };
 
   const handleUpdateHabit = async (id: string, updates: Partial<Habit>) => {
-      setHabits(prev => prev.map(h => h.id === id ? { ...h, ...updates } : h));
       await updateHabit(id, updates);
+      refreshHabits();
   };
 
   const handleQuickAdd = async (preset: PresetHabit) => {
-    await createHabit(
-      preset.title, 
-      preset.priority, 
-      preset.color, 
-      preset.category
-    );
-    loadData();
+    await createHabit(preset.title, preset.priority, preset.color, preset.category);
+    refreshHabits();
   };
 
   const openDetails = (habit: HabitWithCompletion) => {
@@ -230,25 +166,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
 
   const handleSaveHabit = async (title: string, priority: Priority, color: string, category: string, reminderTime?: string, reminderDate?: string, reminderDays?: string[]) => {
     if (editingHabit) {
-      await updateHabit(editingHabit.id, {
-        title, priority, color, category, reminder_time: reminderTime, reminder_date: reminderDate, reminder_days: reminderDays
-      });
+      await updateHabit(editingHabit.id, { title, priority, color, category, reminder_time: reminderTime, reminder_date: reminderDate, reminder_days: reminderDays });
     } else {
       await createHabit(title, priority, color, category, reminderTime, reminderDate, reminderDays);
     }
-    loadData();
+    refreshHabits();
     setIsEditModalOpen(false);
     setEditingHabit(null);
   };
 
   const handleDeleteHabit = async (id: string) => {
     await deleteHabit(id);
-    setHabits((prevHabits) => prevHabits.filter((h) => h.id !== id));
-    setIsEditModalOpen(false);
-    setEditingHabit(null);
-  };
-
-  const handleCloseEditModal = () => {
+    refreshHabits();
     setIsEditModalOpen(false);
     setEditingHabit(null);
   };
@@ -257,49 +186,36 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
   const dateString = selectedDate.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
   const isToday = selectedDate.toDateString() === new Date().toDateString();
 
-  const showSuggestions = !isLoading && habits.length === 0 && !isSuggestionsDismissed;
-
   return (
     <div className="flex flex-col h-full w-full bg-background text-primary font-sans relative overflow-hidden">
-      
-      {/* Background Orbs */}
       <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-400/20 dark:bg-blue-600/10 rounded-full blur-[100px] animate-pulse" style={{ animationDuration: '8s' }} />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-purple-400/20 dark:bg-cyan-600/10 rounded-full blur-[100px] animate-pulse" style={{ animationDuration: '12s' }} />
+        <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-400/20 dark:bg-blue-600/10 rounded-full blur-[100px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-purple-400/20 dark:bg-cyan-600/10 rounded-full blur-[100px]" />
       </div>
 
-      {/* Main Scrollable Area */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden pb-32 pt-4 space-y-8 relative z-10 no-scrollbar">
-        
-        {/* Glass Hero Card */}
-        <div className="mx-4 mt-2 p-6 bg-surface backdrop-blur-xl rounded-[2.5rem] border border-white/50 dark:border-white/5 shadow-xl relative overflow-hidden transition-all duration-300">
-           
-           {/* Header Row: Date & Controls */}
+      <div className="flex-1 overflow-y-auto pb-32 pt-4 space-y-8 relative z-10 no-scrollbar">
+        <div className="mx-4 mt-2 p-6 bg-surface backdrop-blur-xl rounded-[2.5rem] border border-white/50 dark:border-white/5 shadow-xl relative overflow-hidden">
            <div className="flex justify-between items-start mb-6">
-              
-              {/* Left Column: Greeting, Level, Date */}
               <div className="flex flex-col gap-3">
-                 
-                 {/* Profile Block */}
-                 {userProfile && (
+                 {(userProfile || userLoading) && (
                    <div className="flex items-center gap-3">
-                       <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold text-sm shadow-md ring-2 ring-white/50 dark:ring-white/10">
-                           {userProfile.first_name?.[0]?.toUpperCase() || 'U'}
-                       </div>
+                       {userLoading && !userProfile ? (
+                           <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-slate-700 animate-pulse" />
+                       ) : (
+                           <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold text-sm shadow-md ring-2 ring-white/50 dark:ring-white/10">
+                               {userProfile?.first_name?.[0]?.toUpperCase() || 'U'}
+                           </div>
+                       )}
                        <div>
                            <div className="flex items-center gap-2">
-                               <span className="font-bold text-sm text-primary leading-none truncate max-w-[100px]">
-                                   {userProfile.first_name || 'User'}
+                               <span className="font-bold text-sm text-primary leading-none">
+                                   {userProfile?.first_name || 'User'}
                                </span>
                            </div>
-                           <span className="text-xs text-secondary font-medium">
-                               Welcome back!
-                           </span>
+                           <span className="text-xs text-secondary font-medium">Welcome back!</span>
                        </div>
                    </div>
                  )}
-
-                 {/* Date Block */}
                  <div>
                     <p className="text-xs font-bold text-secondary uppercase tracking-wide mb-1 opacity-80">
                       {isToday ? t.today : t.selected_date}
@@ -310,23 +226,28 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
                  </div>
               </div>
 
-              {/* Right Column: Controls */}
               <div className="flex flex-col items-end gap-3 z-10">
-                 
-                 {/* Buttons Row */}
                  <div className="flex gap-2 items-center">
-                    {/* Language Toggle */}
+                    <button 
+                      onClick={handleManualRefresh}
+                      className={cn(
+                        "w-10 h-10 rounded-full bg-white/50 dark:bg-slate-700/50 shadow-sm border border-white/60 dark:border-white/10 flex items-center justify-center text-secondary active:scale-95 transition-all",
+                        isRefreshing && "animate-spin"
+                      )}
+                    >
+                      <RefreshCw size={18} />
+                    </button>
+
                     <button 
                       onClick={toggleLanguage}
-                      className="w-10 h-10 rounded-full bg-white/50 dark:bg-slate-700/50 hover:bg-white dark:hover:bg-slate-700 shadow-sm border border-white/60 dark:border-white/10 flex items-center justify-center text-secondary active:scale-95 transition-all"
+                      className="w-10 h-10 rounded-full bg-white/50 dark:bg-slate-700/50 shadow-sm border border-white/60 dark:border-white/10 flex items-center justify-center text-secondary active:scale-95 transition-all"
                     >
                       <span className="text-xs font-bold">{language.toUpperCase()}</span>
                     </button>
 
-                    {/* Theme Toggle */}
                     <button 
                       onClick={toggleTheme}
-                      className="w-10 h-10 rounded-full bg-white/50 dark:bg-slate-700/50 hover:bg-white dark:hover:bg-slate-700 shadow-sm border border-white/60 dark:border-white/10 flex items-center justify-center text-secondary active:scale-95 transition-all overflow-hidden"
+                      className="w-10 h-10 rounded-full bg-white/50 dark:bg-slate-700/50 shadow-sm border border-white/60 dark:border-white/10 flex items-center justify-center text-secondary active:scale-95 transition-all overflow-hidden"
                     >
                       <AnimatePresence mode="wait" initial={false}>
                           <motion.div
@@ -341,28 +262,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
                       </AnimatePresence>
                     </button>
 
-                    {/* Calendar Toggle */}
                     <button 
                       onClick={() => setIsCalendarOpen(!isCalendarOpen)}
                       className={cn(
                         "w-10 h-10 rounded-full shadow-sm border flex items-center justify-center transition-all duration-300",
                         isCalendarOpen 
                           ? "bg-accent text-white border-accent shadow-blue-200 dark:shadow-none" 
-                          : "bg-white/50 dark:bg-slate-700/50 hover:bg-white dark:hover:bg-slate-700 text-secondary border-white/60 dark:border-white/10"
+                          : "bg-white/50 dark:bg-slate-700/50 text-secondary border-white/60 dark:border-white/10"
                       )}
                     >
                       <CalendarIcon size={18} strokeWidth={2.5} />
                     </button>
                  </div>
 
-                 {/* Gamification Stats (Level & XP) */}
                  <div className="flex items-center gap-2 bg-surface/50 dark:bg-slate-800/50 p-1.5 pr-3 rounded-full border border-gray-100 dark:border-white/5 backdrop-blur-md shadow-sm">
-                    {/* Level Badge */}
-                    <div className="bg-indigo-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg shadow-indigo-500/30">
+                    <div className="bg-indigo-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-full">
                         Lvl {userProfile?.level || 1}
                     </div>
-                    
-                    {/* Progress Bar Container */}
                     <div className="hidden sm:flex flex-col gap-1 min-w-[60px]">
                         <div className="h-1.5 w-full bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
                             <motion.div 
@@ -373,17 +289,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
                             />
                         </div>
                     </div>
-                    
-                    {/* XP Text */}
-                    <span className="text-[10px] font-bold text-secondary whitespace-nowrap">
+                    <span className="text-[10px] font-bold text-secondary">
                         {(userProfile?.xp || 0) % 100} <span className="opacity-60 text-[9px]">/ 100 XP</span>
                     </span>
                  </div>
-
               </div>
            </div>
 
-           {/* Collapsible Calendar inside Card */}
            <AnimatePresence>
               {isCalendarOpen && (
                 <motion.div
@@ -397,7 +309,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
               )}
            </AnimatePresence>
 
-           {/* Circular Progress & Text */}
            <div className="flex flex-col items-center justify-center relative">
                <CircularProgress 
                   percentage={progressPercentage} 
@@ -423,7 +334,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
            </div>
         </div>
 
-        {/* Habit List */}
         <section className="px-5">
              <div className="flex justify-between items-end mb-4 px-2">
                  <h2 className="text-xl font-extrabold text-primary tracking-tight">{t.habits_section_title}</h2>
@@ -442,14 +352,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
               </div>
             ) : (
               <div className="flex flex-col gap-4">
-                
                 <AnimatePresence>
-                  {showSuggestions && (
+                  {(!isLoading && habits.length === 0 && !isSuggestionsDismissed) && (
                     <motion.div
                       initial={{ opacity: 0, height: 0, scale: 0.9 }}
                       animate={{ opacity: 1, height: 'auto', scale: 1 }}
                       exit={{ opacity: 0, height: 0, scale: 0.9, marginBottom: 0 }}
-                      transition={{ duration: 0.4, type: "spring", bounce: 0 }}
                       className="overflow-hidden mb-2 origin-top"
                     >
                        <HabitSuggestions 
@@ -460,7 +368,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
                   )}
                 </AnimatePresence>
                 
-                {/* Empty State */}
                 {habits.length === 0 && isSuggestionsDismissed && (
                   <motion.div 
                     initial={{ opacity: 0 }}
@@ -498,29 +405,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
               <WeeklyChart data={weeklyStats} />
           </section>
         )}
-
       </div>
 
-      <HabitDetailsModal
-        isOpen={isDetailsOpen}
-        onClose={() => setIsDetailsOpen(false)}
-        habit={selectedHabitDetails}
-      />
-      
-      <AddHabitModal 
-        isOpen={isEditModalOpen} 
-        onClose={handleCloseEditModal} 
-        onSave={handleSaveHabit}
-        onDelete={() => editingHabit && handleDeleteHabit(editingHabit.id)}
-        initialHabit={editingHabit}
-      />
-
-      <BadgeUnlockModal 
-        badgeId={unlockedBadge} 
-        onClose={() => setUnlockedBadge(null)} 
-      />
-
-      {/* Bot Subscription Banner */}
+      <HabitDetailsModal isOpen={isDetailsOpen} onClose={() => setIsDetailsOpen(false)} habit={selectedHabitDetails} />
+      <AddHabitModal isOpen={isEditModalOpen} onClose={() => { setIsEditModalOpen(false); setEditingHabit(null); }} onSave={handleSaveHabit} onDelete={() => editingHabit && handleDeleteHabit(editingHabit.id)} initialHabit={editingHabit} />
+      <BadgeUnlockModal badgeId={unlockedBadge} onClose={() => setUnlockedBadge(null)} />
       <BotSubscriptionBanner />
     </div>
   );
