@@ -1,8 +1,27 @@
+
 import { Habit, Completion, HabitWithCompletion, Priority, User } from '../types';
 import { formatDateKey } from '../lib/utils';
 
 const TEST_USER_ID = 99999999;
 let hasVerifiedUser = false;
+
+// --- TTL CONSTANTS (MS) ---
+export const CACHE_TTL = {
+  USER_PROFILE: 600000,   // 10 minutes
+  HABITS_LIST: 300000,    // 5 minutes
+  HABIT_HISTORY: 900000,  // 15 minutes
+  DEFAULT: 300000,        // 5 minutes
+};
+
+// --- CACHE KEYS ---
+export const CACHE_KEYS = {
+  USER_PROFILE: 'user:profile',
+  HABITS_LIST: (date: string) => `habits:list:${date}`,
+  HABIT_HISTORY: (id: string) => `habit:history:${id}`,
+  WEEKLY_STATS: 'stats:weekly',
+  HEATMAP: 'stats:heatmap',
+  RPG: 'stats:rpg',
+};
 
 // --- HELPERS ---
 
@@ -16,7 +35,7 @@ export const getCurrentUserId = (): number => {
   return userId;
 };
 
-// Generic Fetch Wrapper to inject Authentication Headers
+// Generic Fetch Wrapper
 const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
   const userId = getCurrentUserId();
   const headers = {
