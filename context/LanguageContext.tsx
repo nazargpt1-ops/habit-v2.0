@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, PropsWithChildren } from 'react';
+import React, { createContext, useContext, useState, useEffect, PropsWithChildren } from 'react';
 import { Translations, Language } from '../types';
 
 const dictionaries: Record<Language, Translations> = {
@@ -340,12 +340,10 @@ export const LanguageProvider = ({ children }: PropsWithChildren) => {
   const [language, setLanguage] = useState<Language>('en');
 
   useEffect(() => {
-    // Try to get from local storage first
     const saved = localStorage.getItem('habitflow-lang') as Language;
     if (saved && (saved === 'en' || saved === 'ru')) {
       setLanguage(saved);
     } else {
-      // Try to detect from Telegram
       if (typeof window !== 'undefined' && window.Telegram?.WebApp?.initDataUnsafe?.user?.language_code) {
         const tgLang = window.Telegram.WebApp.initDataUnsafe.user.language_code;
         if (tgLang.startsWith('ru')) setLanguage('ru');
