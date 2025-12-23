@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { HistoryHeatmap } from '../components/HistoryHeatmap';
 import { AchievementsGrid } from '../components/AchievementsGrid';
@@ -39,10 +38,16 @@ export const Statistics: React.FC = () => {
         fetchUserProfile()
       ]);
       
-      setHeatmapData(stats.heatmap);
-      setTotalCompletions(stats.totalCompletions);
-      setCurrentStreak(stats.currentStreak);
-      setRpgData(rpg);
+      if (stats) {
+        setHeatmapData(stats.heatmap);
+        setTotalCompletions(stats.totalCompletions);
+        setCurrentStreak(stats.currentStreak);
+      }
+      
+      if (rpg) {
+        setRpgData(rpg);
+      }
+      
       setUserProfile(profile);
     } catch (e) {
       console.error("Failed to load statistics:", e);
