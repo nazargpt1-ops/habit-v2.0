@@ -10,6 +10,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,PATCH,GET,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, x-telegram-id');
+  res.setHeader('Content-Type', 'application/json');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
@@ -21,28 +22,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'POST') {
       const { habitId, date, isCompleted, note } = req.body;
       const userId = telegramId;
-      const dateKey = date; // Expecting YYYY-MM-DD
+      const dateKey = date;
 
-      // 1. Get Habit Info
       const { data: habit } = await supabase.from('habits').select('coins_reward').eq('id', habitId).single();
       const reward = habit?.coins_reward || 10;
       const xpReward = 10;
 
-      // 2. Fetch User Info for Updates
       const { data: user } = await supabase.from('users').select('total_coins, xp, level').eq('telegram_id', userId).single();
       let newBadge: string | null = null;
       let newId: string | undefined;
 
       if (isCompleted) {
-        // --- ADD COMPLETION ---
         const potentialBadges: string[] = [];
-        
-        // Check Early Bird
         const now = new Date();
-        // Convert to rough user time if possible, or use server time
         if (now.getHours() < 8) potentialBadges.push('early_bird');
 
-        // Check duplicates
         const { data: existing } = await supabase.from('completions').select('id').eq('habit_id', habitId).eq('date', dateKey).maybeSingle();
         
         if (!existing) {
@@ -61,7 +55,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (insertError) throw insertError;
             newId = inserted.id;
 
-            // Update User Stats
             const oldLevel = user?.level || 1;
             const newCoins = (user?.total_coins || 0) + reward;
             const newXP = (user?.xp || 0) + xpReward;
@@ -69,16 +62,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             await supabase.from('users').update({ total_coins: newCoins, xp: newXP, level: newLevel }).eq('telegram_id', userId);
 
-            // Badge Check: Level 5
             if (oldLevel < 5 && newLevel >= 5) potentialBadges.push('level_5');
 
-            // Badge Check: Counts & Streaks
-            // Need all user completion dates
             const { data: userCompletions } = await supabase.from('completions').select('date').eq('user_id', userId);
             const dates = (userCompletions || []).map((c: any) => c.date);
             const count = dates.length;
             
-            // Calc Global Streak
             const uniqueDates = Array.from(new Set(dates)).sort((a: any, b: any) => b.localeCompare(a));
             let streak = 0;
             const todayStr = new Date().toISOString().split('T')[0];
@@ -99,7 +88,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (count === 1) potentialBadges.push('first_step');
             if (streak === 7) potentialBadges.push('week_streak');
 
-            // Priority Logic
             if (potentialBadges.includes('level_5')) newBadge = 'level_5';
             else if (potentialBadges.includes('week_streak')) newBadge = 'week_streak';
             else if (potentialBadges.includes('first_step')) newBadge = 'first_step';
@@ -111,10 +99,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ success: true, newId, coinsEarned: reward, newBadge });
 
       } else {
-        // --- REMOVE COMPLETION ---
         await supabase.from('completions').delete().eq('habit_id', habitId).eq('date', dateKey);
         
-        // Revert Stats
         if (user) {
             const newCoins = Math.max(0, (user.total_coins || 0) - reward);
             const newXP = Math.max(0, (user.xp || 0) - xpReward);
@@ -136,6 +122,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // --- GET: Fetch History for a Habit ---
     if (req.method === 'GET') {
+        res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
         const { habitId } = req.query;
         if (!habitId) return res.status(400).json({ error: 'Missing habitId' });
 
