@@ -10,6 +10,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, x-telegram-id');
+  res.setHeader('Content-Type', 'application/json');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
@@ -19,6 +20,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     // --- GET: Fetch Habits (optionally with completions for a date) ---
     if (req.method === 'GET') {
+      res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
       const { date } = req.query; // YYYY-MM-DD
 
       // 1. Fetch Habits
@@ -44,10 +46,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         if (compError) throw compError;
 
-        // 3. Fetch ALL completions to calculate streak (heavy, but needed for current logic)
-        // Optimization: In a real app, store streak on the habit table. 
-        // For now, we fetch all completions for these habits to calc streak server-side or pass to client.
-        // To keep payload small, let's fetch history for streak calculation.
         const { data: allCompletions } = await supabase
            .from('completions')
            .select('habit_id, date')
@@ -57,13 +55,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const habitCompletions = allCompletions?.filter((c: any) => c.habit_id === habit.id) || [];
             const todayCompletion = completions?.find((c: any) => c.habit_id === habit.id);
             
-            // Calculate streak logic here or send dates to client
-            // We'll mimic the client-side calculator for now by sending dates
-            // But to save bandwidth, let's compute streak here if possible, 
-            // or just let client do it if we return all history (too heavy).
-            // Let's return the raw list of dates for the client to calc streak, 
-            // OR implement the streak logic here. Let's implement logic here.
-            
             const sortedDates = habitCompletions.map((c: any) => c.date).sort((a: string, b: string) => b.localeCompare(a));
             let streak = 0;
             if (sortedDates.length > 0) {
@@ -71,7 +62,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                  const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
                  const yesterdayStr = yesterday.toISOString().split('T')[0];
                  
-                 // Check if streak is alive
                  if (sortedDates[0] === todayStr || sortedDates[0] === yesterdayStr) {
                     let currentCheck = new Date();
                     if (sortedDates[0] !== todayStr) currentCheck.setDate(currentCheck.getDate() - 1);
