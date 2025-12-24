@@ -10,6 +10,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, x-telegram-id');
+  res.setHeader('Content-Type', 'application/json');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
@@ -19,6 +20,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { type } = req.query; // 'weekly', 'heatmap', 'rpg'
 
   try {
+    if (req.method === 'GET') {
+      res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+    }
+
     // 1. Weekly Stats
     if (type === 'weekly') {
         const today = new Date();
@@ -65,10 +70,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const startDate = new Date(today);
         startDate.setDate(startDate.getDate() - 364);
 
-        // Helper to format date key
         const formatKey = (d: Date) => d.toISOString().split('T')[0];
 
-        // Loop from startDate to today
         for (let d = new Date(startDate); d <= today; d.setDate(d.getDate() + 1)) {
             const key = formatKey(d);
             const count = counts[key] || 0;
@@ -77,7 +80,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             heatmap.push({ date: key, count, level });
         }
 
-        // Calculate Streak server-side
         const uniqueDates = Array.from(new Set(dates)).sort((a: any, b: any) => b.localeCompare(a));
         let streak = 0;
         const todayStr = formatKey(new Date());
