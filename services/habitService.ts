@@ -1,4 +1,3 @@
-
 import { Habit, Completion, HabitWithCompletion, Priority, User } from '../types';
 import { formatDateKey } from '../lib/utils';
 
@@ -35,7 +34,7 @@ export const getCurrentUserId = (): number => {
   return userId;
 };
 
-// Generic Fetch Wrapper
+// Generic Fetch Wrapper - ИСПРАВЛЕНО ✅
 const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
   const userId = getCurrentUserId();
   const headers = {
@@ -46,13 +45,25 @@ const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
 
   try {
     const response = await fetch(endpoint, { ...options, headers });
-    if (!response.ok) {
-        throw new Error(`API Error: ${response.statusText}`);
+    
+    // 304 Not Modified = данные не изменились, используй кеш
+    if (response.status === 304) {
+      console.log(`[304] Cache hit for ${endpoint}`);
+      return null;
     }
-    return await response.json();
+    
+    // Проверка на ошибки
+    if (!response.ok) {
+      throw new Error(`API Error: ${response.status} ${response.statusText}`);
+    }
+    
+    // Успешный ответ - парсим JSON
+    const data = await response.json();
+    return data;
+    
   } catch (error) {
     console.error(`Fetch error for ${endpoint}:`, error);
-    return null;
+    throw error; // Пробрасываем ошибку дальше, не возвращаем null
   }
 };
 
