@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, PropsWithChildren } from 'react';
 import { Translations, Language } from '../types';
 
@@ -50,8 +51,6 @@ const dictionaries: Record<Language, Translations> = {
     setFor: "Set for",
     remindAt: "Remind at",
     category: "Category",
-
-    // New I18n Keys
     ready_to_start: "Ready to start?",
     one_step: "One step at a time",
     weekly_focus: "Weekly Focus",
@@ -76,22 +75,16 @@ const dictionaries: Record<Language, Translations> = {
     delete_habit: "Delete Habit",
     confirm: "Confirm",
     selected_date: "Selected",
-    
-    // Progress States
     progress_perfect: "Crushed it! 🎉",
     progress_perfect_sub: "You completed all habits",
     progress_keep_going: "Keep the momentum!",
     progress_keep_going_sub: "One step at a time",
-
-    // Categories
     cat_health: "Health",
     cat_social: "Social",
     cat_growth: "Growth",
     cat_mind: "Mind",
     cat_work: "Work",
     cat_energy: "Energy",
-
-    // Days
     day_mon: "Mon",
     day_tue: "Tue",
     day_wed: "Wed",
@@ -99,8 +92,6 @@ const dictionaries: Record<Language, Translations> = {
     day_fri: "Fri",
     day_sat: "Sat",
     day_sun: "Sun",
-
-    // Stats & Profile
     streak_label: "Current Streak",
     days_in_row: "Days in a row",
     total_label: "Total Completed",
@@ -118,16 +109,12 @@ const dictionaries: Record<Language, Translations> = {
     challenge_desc: "Complete 50 habits this month to unlock the badge",
     view_progress: "View Progress",
     new_badge: "New",
-
-    // RPG Stats
     rpg_vit: "VIT (Health)",
     rpg_int: "INT (Mind)",
     rpg_dis: "DIS (Work)",
     rpg_cha: "CHA (Social)",
     rpg_wis: "WIS (Growth)",
     rpg_sta: "STA (Energy)",
-
-    // Achievements
     achievements_title: "Achievements",
     badge_first_step_title: "First Step",
     badge_first_step_desc: "Complete your first habit",
@@ -138,17 +125,11 @@ const dictionaries: Record<Language, Translations> = {
     badge_early_bird_title: "Early Bird",
     badge_early_bird_desc: "Complete a habit before 8 AM",
     badge_locked: "Locked",
-
-    // Sharing
     share_message: "I'm building better habits with HabitFlow! 🚀\n\n🔥 Current Streak: {streak} days\n🏆 Total Habits: {total}\n\nJoin me and level up your life! 👇",
-
-    // Referral
     referral_title: "Invite Friends & Earn XP",
     referral_desc: "Get +100 XP for every friend who joins.",
     referral_btn: "Invite Friend",
     referral_share_text: "Join me in HabitFlow and level up your life! 🚀",
-
-    // Quick Start Presets
     quick_start_title: "Quick Start",
     quick_start_desc: "Choose a template to begin",
     preset_diction: "Work on Diction",
@@ -157,11 +138,25 @@ const dictionaries: Record<Language, Translations> = {
     preset_water: "Drink Water",
     preset_meditation: "Meditation",
     preset_no_sugar: "No Sugar",
-
-    // Bot Banner
     bot_banner_text: "🔔 Subscribe to our bot to receive daily task notifications.",
     bot_banner_btn: "Open Bot",
-    bot_required_alert: "⚠️ To receive reminders, you need to start the bot first."
+    bot_required_alert: "⚠️ To receive reminders, you need to start the bot first.",
+
+    // Onboarding
+    onboarding_next: "Next",
+    onboarding_prev: "Back",
+    onboarding_skip: "Skip",
+    onboarding_finish: "Let's Go!",
+    onboarding_step1_title: "Welcome to HabitFlow!",
+    onboarding_step1_desc: "Your journey to consistency starts here. Watch your daily progress right in the center.",
+    onboarding_step2_title: "Build Your Routine",
+    onboarding_step2_desc: "Tap the big '+' button below to add your first habit. You can use our presets for a quick start!",
+    onboarding_step3_title: "Make it Yours",
+    onboarding_step3_desc: "Change theme or language at any time using the buttons in the top right corner.",
+    onboarding_step4_title: "Track Your Growth",
+    onboarding_step4_desc: "Visit the Stats tab to see your Skill Tree, activity history, and unlock cool achievements.",
+    onboarding_step5_title: "Stay Connected",
+    onboarding_step5_desc: "Subscribe to our bot to receive daily reminders about unfinished habits and stay updated!"
   },
   ru: {
     greeting: "Привет",
@@ -211,8 +206,6 @@ const dictionaries: Record<Language, Translations> = {
     setFor: "Повторять",
     remindAt: "Время",
     category: "Категория",
-
-    // New I18n Keys
     ready_to_start: "Готовы начать?",
     one_step: "Шаг за шагом к цели",
     weekly_focus: "Активность недели",
@@ -237,22 +230,16 @@ const dictionaries: Record<Language, Translations> = {
     delete_habit: "Удалить привычку",
     confirm: "Подтвердить",
     selected_date: "Выбрано",
-
-    // Progress States
     progress_perfect: "Отлично! 🎉",
     progress_perfect_sub: "Все привычки выполнены",
     progress_keep_going: "Так держать!",
     progress_keep_going_sub: "Продолжайте в том же духе",
-
-    // Categories
     cat_health: "Здоровье",
     cat_social: "Общение",
     cat_growth: "Саморазвитие",
     cat_mind: "Интеллект",
     cat_work: "Работа",
     cat_energy: "Энергия",
-    
-    // Days
     day_mon: "Пн",
     day_tue: "Вт",
     day_wed: "Ср",
@@ -260,8 +247,6 @@ const dictionaries: Record<Language, Translations> = {
     day_fri: "Пт",
     day_sat: "Сб",
     day_sun: "Вс",
-
-    // Stats & Profile
     streak_label: "Текущая серия",
     days_in_row: "дней подряд",
     total_label: "Всего выполнено",
@@ -279,16 +264,12 @@ const dictionaries: Record<Language, Translations> = {
     challenge_desc: "Выполни 50 привычек в этом месяце",
     view_progress: "Смотреть прогресс",
     new_badge: "Новое",
-
-    // RPG Stats
     rpg_vit: "VIT (Здоровье)",
     rpg_int: "INT (Интеллект)",
     rpg_dis: "DIS (Дисциплина)",
     rpg_cha: "CHA (Харизма)",
     rpg_wis: "WIS (Мудрость)",
     rpg_sta: "STA (Выносливость)",
-
-    // Achievements
     achievements_title: "Достижения",
     badge_first_step_title: "Первый шаг",
     badge_first_step_desc: "Выполни первую привычку",
@@ -299,17 +280,11 @@ const dictionaries: Record<Language, Translations> = {
     badge_early_bird_title: "Ранняя пташка",
     badge_early_bird_desc: "Выполни привычку до 8 утра",
     badge_locked: "Закрыто",
-
-    // Sharing
     share_message: "Я прокачиваю привычки в HabitFlow! 🚀\n\n🔥 Текущая серия: {streak} дн.\n🏆 Выполнено: {total}\n\nПрисоединяйся, попробуем не слиться вместе! 👇",
-
-    // Referral
     referral_title: "Пригласи друга",
     referral_desc: "Получи +100 XP за каждого друга.",
     referral_btn: "Пригласить",
     referral_share_text: "Присоединяйся ко мне в HabitFlow и прокачивай свою жизнь! 🚀",
-
-    // Quick Start Presets
     quick_start_title: "Быстрый старт",
     quick_start_desc: "Выберите шаблон для начала",
     preset_diction: "Работа над дикцией",
@@ -318,11 +293,25 @@ const dictionaries: Record<Language, Translations> = {
     preset_water: "Пить воду",
     preset_meditation: "Медитация",
     preset_no_sugar: "Без сахара",
-
-    // Bot Banner
     bot_banner_text: "🔔 Подпишись на наш телеграм бот, чтобы быть в курсе событий и получать уведомления о задачах",
     bot_banner_btn: "Открыть бота",
-    bot_required_alert: "⚠️ Для получения напоминаний нужно запустить бота."
+    bot_required_alert: "⚠️ Для получения напоминаний нужно запустить бота.",
+
+    // Onboarding
+    onboarding_next: "Далее",
+    onboarding_prev: "Назад",
+    onboarding_skip: "Пропустить",
+    onboarding_finish: "Поехали!",
+    onboarding_step1_title: "Добро пожаловать!",
+    onboarding_step1_desc: "Твой путь к дисциплине начинается здесь. Следи за дневным прогрессом в центре экрана.",
+    onboarding_step2_title: "Создавай привычки",
+    onboarding_step2_desc: "Нажми на большую кнопку '+' внизу, чтобы добавить свою первую привычку. Используй шаблоны для быстрого старта!",
+    onboarding_step3_title: "Настрой под себя",
+    onboarding_step3_desc: "Меняй тему оформления или язык в любой момент кнопками в верхнем правом углу.",
+    onboarding_step4_title: "Следи за ростом",
+    onboarding_step4_desc: "Заходи во вкладку статистики, чтобы увидеть свое древо навыков, историю активности и новые достижения.",
+    onboarding_step5_title: "Не пропускай важное",
+    onboarding_step5_desc: "Подпишись на нашего бота, чтобы получать ежедневные напоминания о незакрытых привычках и новости!"
   }
 };
 
