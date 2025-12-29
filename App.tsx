@@ -10,7 +10,8 @@ import { LayoutGrid, BarChart3, Plus } from 'lucide-react';
 import { cn } from './lib/utils';
 import { motion as m, AnimatePresence } from 'framer-motion';
 import { AddHabitModal } from './components/AddHabitModal';
-import { createHabit } from './services/habitService';
+import { OnboardingGuide } from './components/OnboardingGuide';
+import { createHabit, getCurrentUserId } from './services/habitService';
 
 const motion = m as any;
 
@@ -20,10 +21,29 @@ const AppContent = () => {
   const [activeTab, setActiveTab] = useState<Tab>(Tab.HABITS);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<number>(Date.now());
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     initTelegramApp();
+    
+    // Check if onboarding is needed
+    const userId = getCurrentUserId();
+    const storageKey = `habitflow_onboarding_completed_${userId}`;
+    const isCompleted = localStorage.getItem(storageKey);
+    
+    if (!isCompleted) {
+      // Delay onboarding slightly for a better feel
+      setTimeout(() => setShowOnboarding(true), 1500);
+    }
   }, []);
+
+  useEffect(() => {
+    if (showOnboarding) {
+      document.body.classList.add('onboarding-active');
+    } else {
+      document.body.classList.remove('onboarding-active');
+    }
+  }, [showOnboarding]);
 
   const handleSaveHabit = async (title: string, priority: Priority, color: string, category: string, reminderTime?: string, reminderDate?: string, reminderDays?: string[]) => {
     await createHabit(title, priority, color, category, reminderTime, reminderDate, reminderDays);
@@ -31,9 +51,23 @@ const AppContent = () => {
     setIsModalOpen(false);
   };
 
+  const handleOnboardingComplete = () => {
+    const userId = getCurrentUserId();
+    const storageKey = `habitflow_onboarding_completed_${userId}`;
+    localStorage.setItem(storageKey, 'true');
+    setShowOnboarding(false);
+  };
+
   return (
-    <div className="h-screen w-screen flex flex-col bg-background text-primary transition-colors duration-300 relative overflow-hidden">
+    <div className="h-screen w-screen flex flex-col bg-background text-primary transition-colors duration-300 relative overflow-hidden m-0 p-0">
       
+      {/* Onboarding Overlay - Rendered outside main layout containers for perfect alignment */}
+      <AnimatePresence>
+        {showOnboarding && (
+          <OnboardingGuide onComplete={handleOnboardingComplete} />
+        )}
+      </AnimatePresence>
+
       {/* View Container */}
       <main className="flex-1 overflow-hidden relative">
         <AnimatePresence mode="wait">
@@ -46,7 +80,10 @@ const AppContent = () => {
             className="h-full w-full"
           >
             {activeTab === Tab.HABITS ? (
-              <Dashboard lastUpdated={lastUpdated} />
+              <Dashboard 
+                lastUpdated={lastUpdated} 
+                onShowOnboarding={() => setShowOnboarding(true)} 
+              />
             ) : (
               <Statistics />
             )}
