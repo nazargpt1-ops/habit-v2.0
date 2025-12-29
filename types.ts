@@ -114,7 +114,6 @@ export interface Translations {
   everyday: string;
   swipeHint: string;
   theme: string;
-  // Legacy color keys (keeping for compatibility if needed, though strictly replacing usage)
   enableReminder: string;
   colorHealth: string;
   colorWork: string;
@@ -125,8 +124,6 @@ export interface Translations {
   setFor: string;
   remindAt: string;
   category: string;
-
-  // New I18n Keys
   ready_to_start: string;
   one_step: string;
   weekly_focus: string;
@@ -134,7 +131,7 @@ export interface Translations {
   last_7_days: string;
   habits_section_title: string;
   done_count: string;
-  create_habit_btn: string; // distinct from header
+  create_habit_btn: string; 
   edit_habit: string;
   habit_title_label: string;
   placeholder_title: string;
@@ -143,30 +140,24 @@ export interface Translations {
   priority_medium: string;
   priority_high: string;
   category_label: string;
-  enable_reminder: string; // lowercase alias
+  enable_reminder: string; 
   get_notified: string;
-  remind_at: string; // lowercase alias
+  remind_at: string; 
   save_habit: string;
   save_changes: string;
   delete_habit: string;
   confirm: string;
   selected_date: string;
-
-  // Progress States
   progress_perfect: string;
   progress_perfect_sub: string;
   progress_keep_going: string;
   progress_keep_going_sub: string;
-
-  // Category Keys
   cat_health: string;
   cat_social: string;
   cat_growth: string;
   cat_mind: string;
   cat_work: string;
   cat_energy: string;
-  
-  // Day Keys
   day_mon: string;
   day_tue: string;
   day_wed: string;
@@ -174,8 +165,6 @@ export interface Translations {
   day_fri: string;
   day_sat: string;
   day_sun: string;
-
-  // Stats & Profile
   streak_label: string;
   days_in_row: string;
   total_label: string;
@@ -186,23 +175,19 @@ export interface Translations {
   last_365: string;
   less: string;
   more: string;
-  skill_tree: string; // New
+  skill_tree: string; 
   challenges_title: string;
   global_challenge: string;
   consistency_master: string;
   challenge_desc: string;
   view_progress: string;
   new_badge: string;
-  
-  // RPG Stats Keys
   rpg_vit: string;
   rpg_int: string;
   rpg_dis: string;
   rpg_cha: string;
   rpg_wis: string;
   rpg_sta: string;
-
-  // Achievements
   achievements_title: string;
   badge_first_step_title: string;
   badge_first_step_desc: string;
@@ -213,17 +198,11 @@ export interface Translations {
   badge_early_bird_title: string;
   badge_early_bird_desc: string;
   badge_locked: string;
-
-  // Sharing
   share_message: string;
-  
-  // Referral
   referral_title: string;
   referral_desc: string;
   referral_btn: string;
   referral_share_text: string;
-
-  // Quick Start Presets
   quick_start_title: string;
   quick_start_desc: string;
   preset_diction: string;
@@ -232,9 +211,23 @@ export interface Translations {
   preset_water: string;
   preset_meditation: string;
   preset_no_sugar: string;
-
-  // Bot Banner
   bot_banner_text: string;
   bot_banner_btn: string;
   bot_required_alert: string;
+
+  // Onboarding Guide
+  onboarding_next: string;
+  onboarding_prev: string;
+  onboarding_skip: string;
+  onboarding_finish: string;
+  onboarding_step1_title: string;
+  onboarding_step1_desc: string;
+  onboarding_step2_title: string;
+  onboarding_step2_desc: string;
+  onboarding_step3_title: string;
+  onboarding_step3_desc: string;
+  onboarding_step4_title: string;
+  onboarding_step4_desc: string;
+  onboarding_step5_title: string;
+  onboarding_step5_desc: string;
 }
