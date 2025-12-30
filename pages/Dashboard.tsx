@@ -1,6 +1,7 @@
+
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion as m, AnimatePresence } from 'framer-motion';
-import { Calendar as CalendarIcon, Inbox, Sun, Moon, Zap, RefreshCw } from 'lucide-react';
+import { Calendar as CalendarIcon, Inbox, Sun, Moon, Zap, RefreshCw, HelpCircle } from 'lucide-react';
 import { CalendarStrip } from '../components/CalendarStrip';
 import { HabitCard } from '../components/HabitCard';
 import { HabitDetailsModal } from '../components/HabitDetailsModal';
@@ -31,9 +32,10 @@ const motion = m as any;
 
 interface DashboardProps {
   lastUpdated?: number;
+  onShowOnboarding?: () => void;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated, onShowOnboarding }) => {
   const { t, toggleLanguage, language } = useLanguage();
   const { theme, toggleTheme } = useTheme();
   
@@ -88,10 +90,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
 
   useEffect(() => {
       refreshHabits();
-  }, [lastUpdated, refreshHabits]);
+  }, [lastUpdated]);
 
   const sortedHabits = useMemo(() => {
-    const priorityWeight: Record<Priority, number> = { high: 3, medium: 2, low: 1 };
+    const priorityWeight = { high: 3, medium: 2, low: 1 };
     return [...habits].sort((a, b) => {
       if (a.completed !== b.completed) return a.completed ? 1 : -1;
       const pA = priorityWeight[a.priority || 'medium'];
@@ -109,7 +111,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
   const handleManualRefresh = async () => {
     hapticImpact('light');
     setIsRefreshing(true);
-    clearCache(); // Clear custom cache
+    clearCache(); // Clear custom cache if any
     await refreshHabits();
     setTimeout(() => setIsRefreshing(false), 800);
   };
@@ -226,7 +228,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
               </div>
 
               <div className="flex flex-col items-end gap-3 z-10">
-                 <div className="flex gap-2 items-center">
+                 <div className="flex gap-2 items-center" data-onboarding-target="settings">
+                    <button 
+                      onClick={() => { hapticImpact('light'); onShowOnboarding?.(); }}
+                      className="w-10 h-10 rounded-full bg-white/50 dark:bg-slate-700/50 shadow-sm border border-white/60 dark:border-white/10 flex items-center justify-center text-secondary active:scale-95 transition-all"
+                      aria-label="Help"
+                    >
+                      <HelpCircle size={18} />
+                    </button>
+
                     <button 
                       onClick={handleManualRefresh}
                       className={cn(
@@ -274,7 +284,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
                     </button>
                  </div>
 
-                 <div className="flex items-center gap-2 bg-surface/50 dark:bg-slate-800/50 p-1.5 pr-3 rounded-full border border-gray-100 dark:border-white/5 backdrop-blur-md shadow-sm">
+                 <div className="flex items-center gap-2 bg-surface/50 dark:bg-slate-800/50 p-1.5 pr-3 rounded-full border border-gray-100 dark:border-white/5 backdrop-blur-md shadow-sm" data-onboarding-target="xp-bar">
                     <div className="bg-indigo-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-full">
                         Lvl {userProfile?.level || 1}
                     </div>
@@ -308,7 +318,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ lastUpdated }) => {
               )}
            </AnimatePresence>
 
-           <div className="flex flex-col items-center justify-center relative">
+           <div className="flex flex-col items-center justify-center relative" data-onboarding-target="progress">
                <CircularProgress 
                   percentage={progressPercentage} 
                   size={220} 
