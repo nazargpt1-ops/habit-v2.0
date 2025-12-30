@@ -230,4 +230,6 @@ export interface Translations {
   onboarding_step4_desc: string;
   onboarding_step5_title: string;
   onboarding_step5_desc: string;
+  onboarding_step_xp_title: string;
+  onboarding_step_xp_desc: string;
 }
