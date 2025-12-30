@@ -119,6 +119,7 @@ const AppContent = () => {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => setIsModalOpen(true)}
+            data-onboarding-target="add-button"
             className="w-14 h-14 rounded-full bg-primary dark:bg-accent text-background dark:text-slate-900 flex items-center justify-center shadow-lg shadow-black/20 dark:shadow-accent/20 border-4 border-white/20 dark:border-slate-800 -mt-6 transform transition-transform"
           >
             <Plus size={28} strokeWidth={3} />
@@ -127,6 +128,7 @@ const AppContent = () => {
           {/* Stats Tab */}
           <button 
             onClick={() => setActiveTab(Tab.STATS)}
+            data-onboarding-target="stats-tab"
             className="flex flex-col items-center justify-center relative group"
           >
              <div className={cn(
