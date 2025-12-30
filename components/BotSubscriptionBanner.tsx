@@ -61,6 +61,7 @@ export const BotSubscriptionBanner: React.FC = () => {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 100, opacity: 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          data-onboarding-target="bot-banner"
           className="fixed bottom-24 left-4 right-4 z-[40]" // z-40 to be below the bottom nav (z-50)
         >
           <div className="relative p-4 rounded-2xl shadow-xl overflow-hidden text-white" 
