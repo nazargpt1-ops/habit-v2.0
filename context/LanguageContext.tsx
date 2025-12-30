@@ -156,7 +156,9 @@ const dictionaries: Record<Language, Translations> = {
     onboarding_step4_title: "Track Your Growth",
     onboarding_step4_desc: "Visit the Stats tab to see your Skill Tree, activity history, and unlock cool achievements.",
     onboarding_step5_title: "Stay Connected",
-    onboarding_step5_desc: "Subscribe to our bot to receive daily reminders about unfinished habits and stay updated!"
+    onboarding_step5_desc: "Subscribe to our bot to receive daily reminders about unfinished habits and stay updated!",
+    onboarding_step_xp_title: "Level Up!",
+    onboarding_step_xp_desc: "Earn XP for every completed habit. Reach new levels to unlock future rewards and exclusive perks!"
   },
   ru: {
     greeting: "Привет",
@@ -311,7 +313,9 @@ const dictionaries: Record<Language, Translations> = {
     onboarding_step4_title: "Следи за ростом",
     onboarding_step4_desc: "Заходи во вкладку статистики, чтобы увидеть свое древо навыков, историю активности и новые достижения.",
     onboarding_step5_title: "Не пропускай важное",
-    onboarding_step5_desc: "Подпишись на нашего бота, чтобы получать ежедневные напоминания о незакрытых привычках и новости!"
+    onboarding_step5_desc: "Подпишись на нашего бота, чтобы получать ежедневные напоминания о незакрытых привычках и новости!",
+    onboarding_step_xp_title: "Прокачивайся!",
+    onboarding_step_xp_desc: "Получай XP за каждую выполненную привычку. Повышай уровень, чтобы в будущем открывать награды и крутые бонусы!"
   }
 };
 
